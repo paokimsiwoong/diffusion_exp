@@ -378,6 +378,7 @@ p(x_T) &= \mathcal{N}(x_T; \mathbf{0}, \mathbf{I})
 **Equation 34~45:**
 
 ```math  
+
 \begin{aligned}
 \log p(x)
 &= \log \int p(x_{0:T}) dx_{1:T}\\
@@ -393,6 +394,7 @@ p(x_T) &= \mathcal{N}(x_T; \mathbf{0}, \mathbf{I})
 &= \mathbb{E}_{q(x_{1}|x_0)}\left[\log p_{\boldsymbol{\theta}}(x_0|x_1)\right] + \mathbb{E}_{q(x_{T-1}, x_T|x_0)}\left[\log \frac{p(x_T)}{q(x_T|x_{T-1})}\right] + \sum_{t=1}^{T-1}\mathbb{E}_{q(x_{t-1}, x_t, x_{t+1}|x_0)}\left[\log \frac{p_{\boldsymbol{\theta}}(x_{t}|x_{t+1})}{q(x_{t}|x_{t-1})}\right]\\
 &= \underbrace{\mathbb{E}_{q(x_{1}|x_0)}\left[\log p_{\theta}(x_0|x_1)\right]}_\text{reconstruction term} - \underbrace{\mathbb{E}_{q(x_{T-1}|x_0)}\left[D_{\text{KL}}(q(x_T|x_{T-1}) \| p(x_T))\right]}_\text{prior matching term} - \sum_{t=1}^{T-1}\underbrace{\mathbb{E}_{q(x_{t-1}, x_{t+1}|x_0)}\left[D_{\text{KL}}(q(x_{t}|x_{t-1}) \| p_{\theta}(x_{t}|x_{t+1}))\right]}_\text{consistency term}
 \end{aligned}  
+
 ```
 
 > **(Eq. 43 -> Eq. 44)**
