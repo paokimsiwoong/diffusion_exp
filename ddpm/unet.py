@@ -22,7 +22,7 @@ class Swish(nn.Module):
 
 class TimeEmbedding(nn.Module):
     """
-    transfomer의 positional encoding과 완전히 동일한 sine, cosine 사용하고
+    transfomer의 positional encoding처럼 sine, cosine 사용하고
     문장의 position 부분만 time step으로 변경
     """
 
@@ -41,25 +41,49 @@ class TimeEmbedding(nn.Module):
 
     def forward(self, t: torch.Tensor):
         # Create sinusoidal position embeddings
-        # [same as those from the transformer](../../transformers/positional_encoding.html)
+        # 
+        # t.size() = [batch_size]
+        # t의 각 원소들은 1~T 사이의 임의 추출된 값으로 해당 batch에서 복원을 수행할 time-step t값
         #
         # \begin{align}
         # PE^{(1)}_{t,i} &= sin\Bigg(\frac{t}{10000^{\frac{i}{d - 1}}}\Bigg) \\
         # PE^{(2)}_{t,i} &= cos\Bigg(\frac{t}{10000^{\frac{i}{d - 1}}}\Bigg)
         # \end{align}
         #
-        # where $d$ is `half_dim`
+        # d == half_dim
         half_dim = self.n_channels // 8
+        # 여기서  self.n_channels // 8인 sin, cos 생성해야 concat 후에
+        # emb 다음 linear 층 입력 차원 수인 self.n_channels // 4가 된다.
+
+        # 10000^(i/(d-1)) == e^(log10000 * i /(d-1))
         emb = math.log(10_000) / (half_dim - 1)
+        # i/(d-1)에서 i ∈ [0, d) 이므로 분모도 d-1로 두어서 
+        # i가 최대일때 분수 값이 1이 되도록 설정
+
         emb = torch.exp(torch.arange(half_dim, device=t.device) * -emb)
+        # emb.size() == [half_dim]
+        # 1/(10000^(...)) 꼴이므로 지수에 * -1 되어 있음 
+
         emb = t[:, None] * emb[None, :]
+        # t[:, None]은 [batch_size, 1]
+        # emb[None, :]은 [1, d]
+        # ==> [batch_size, d]
+
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        # 트랜스포머의 PE와 다르게 sine, cosine 홀짝 교차를 하지 않는다.
+        # 이 emb를 생성한 바로 뒤에 nn.Linear 레이어를 통과하므로 linear 층의 가중치 각 행들과 emb의 내적 계산을 한다.
+        # 이 때 각 행의 내적을 보면 (w_i1, w_i2, w_i3, w_i4, ...) · (sin, cos, sin, cos, ....)를 하는 것과
+        # (w_i1, w_i3, w_i5, w_i7, ..., w_i2, w_i4, w_i6, ...) · (sin, sin, sin, sin, ...., cos, cos, cos, ....)로 계산하는 것은 결과가 완전히 동일하다.
+        # 따라서 홀짝교차보다 단순 cat이 메모리 연속성 + 연산 속도 빠름 + 코드 간결 등 이점이 많으므로 홀짝 교차를 하지 않는다.
         emb = torch.cat((emb.sin(), emb.cos()), dim=1)
+        # emb.size() == [batch_size, 2d]
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
         # Transform with the MLP
         emb = self.act(self.lin1(emb))
+        # [batch_size, 2d] 에서 [batch_size, 8d == self.n_channels]로 출력 차원수 증가
         emb = self.lin2(emb)
 
-        #
         return emb
 
 
