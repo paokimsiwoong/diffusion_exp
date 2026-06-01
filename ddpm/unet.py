@@ -24,6 +24,7 @@ class TimeEmbedding(nn.Module):
     """
     transfomer의 positional encoding처럼 sine, cosine 사용하고
     문장의 position 부분만 time step으로 변경
+    https://nn.labml.ai/transformers/positional_encoding.html 참고
     """
 
     def __init__(self, n_channels: int):
@@ -99,9 +100,9 @@ class ResidualBlock(nn.Module):
                  n_groups: int = 32, dropout: float = 0.1):
         """
         * `in_channels` is the number of input channels
-        * `out_channels` is the number of input channels
-        * `time_channels` is the number channels in the time step ($t$) embeddings
-        * `n_groups` is the number of groups for [group normalization](../../normalization/group_norm/index.html)
+        * `out_channels` is the number of output channels
+        * `time_channels` is the number of channels in the time step (t) embeddings
+        * `n_groups` is the number of groups for group normalization (https://nn.labml.ai/normalization/group_norm/index.html)
         * `dropout` is the dropout rate
         """
         super().__init__()
@@ -109,6 +110,8 @@ class ResidualBlock(nn.Module):
         self.norm1 = nn.GroupNorm(n_groups, in_channels)
         self.act1 = Swish()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=(3, 3), padding=(1, 1))
+        # conv 통과 후에 이미지 width, height는 불변
+        # input_length - kernel_size(3) + 1 + (2 * pad_size(1)) = input_length
 
         # Group normalization and the second convolution layer
         self.norm2 = nn.GroupNorm(n_groups, out_channels)
@@ -135,8 +138,15 @@ class ResidualBlock(nn.Module):
         """
         # First convolution layer
         h = self.conv1(self.act1(self.norm1(x)))
+        # h는 [batch_size, out_channels, height, width]
+        
         # Add time embeddings
         h += self.time_emb(self.time_act(t))[:, :, None, None]
+        # t는 [batch_size, time_channels]
+        # self.time_emb(self.time_act(t))는 [batch_size, out_channels]
+        # [:, :, None, None]을 하면
+        # [batch_size, out_channels, 1, 1]이 되어 h에 broadcasting이 되면서 더해질 수 있다.
+
         # Second convolution layer
         h = self.conv2(self.dropout(self.act2(self.norm2(h))))
 
@@ -148,7 +158,7 @@ class AttentionBlock(nn.Module):
     """
     ### Attention block
 
-    This is similar to [transformer multi-head attention](../../transformers/mha.html).
+    transformer MHA와 유사한 형태(https://nn.labml.ai/transformers/mha.html).
     """
 
     def __init__(self, n_channels: int, n_heads: int = 1, d_k: int = None, n_groups: int = 32):
@@ -156,7 +166,7 @@ class AttentionBlock(nn.Module):
         * `n_channels` is the number of channels in the input
         * `n_heads` is the number of heads in multi-head attention
         * `d_k` is the number of dimensions in each head
-        * `n_groups` is the number of groups for [group normalization](../../normalization/group_norm/index.html)
+        * `n_groups` is the number of groups for group normalization (https://nn.labml.ai/normalization/group_norm/index.html)
         """
         super().__init__()
 
@@ -165,8 +175,21 @@ class AttentionBlock(nn.Module):
             d_k = n_channels
         # Normalization layer
         self.norm = nn.GroupNorm(n_groups, n_channels)
+
         # Projections for query, key and values
         self.projection = nn.Linear(n_channels, n_heads * d_k * 3)
+        # 헤드 별로 q, k, v 생성 linear를 따로따로 만드는 경우 nn.Linear(n_channels, d_k)가 n_heads * 3개가 생기지만
+        # nn.Linear(n_channels, n_heads * d_k * 3) 하나만 사용해서 결과물을 head별, q, k, v별로 쪼개주는 방식이 더 효율적
+            # 이미지 인풋 [batch_size, n_channels, height, width]을 attention 연산을 하기 위해 공간 2차원을 1차원 seq로 변경
+            # ==> [batch_size, n_channels, height*width] (height*width == seq ==> seq 하나하나는 픽셀 하나)
+            # seq와 channel 축 transpose ==> [batch_size, seq, n_channels]
+            # self.projection에 입력해 head 별 q, k, v 생성 (q, k, v 모두 d_k 차원)
+            # ==> [batch_size, seq, n_heads * d_k * 3]
+            # view로 [batch_size, seq, n_heads, d_k * 3]로 변경
+            # chunk로 [batch_size, seq, n_heads, d_k]인 q, k, v로 분해
+            # (transformer의 mha와 다르게 [batch_size, n_heads, seq, d_k]로 permute 안하고 einsum으로 해결)
+
+
         # Linear layer for final transformation
         self.output = nn.Linear(n_heads * d_k, n_channels)
         # Scale for dot-product attention
@@ -187,18 +210,38 @@ class AttentionBlock(nn.Module):
         batch_size, n_channels, height, width = x.shape
         # Change `x` to shape `[batch_size, seq, n_channels]`
         x = x.view(batch_size, n_channels, -1).permute(0, 2, 1)
+
         # Get query, key, and values (concatenated) and shape it to `[batch_size, seq, n_heads, 3 * d_k]`
         qkv = self.projection(x).view(batch_size, -1, self.n_heads, 3 * self.d_k)
         # Split query, key, and values. Each of them will have shape `[batch_size, seq, n_heads, d_k]`
         q, k, v = torch.chunk(qkv, 3, dim=-1)
+
         # Calculate scaled dot-product $\frac{Q K^\top}{\sqrt{d_k}}$
         attn = torch.einsum('bihd,bjhd->bijh', q, k) * self.scale
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        # 총 b*h*d개인 (b, h, d) 순서쌍 하나 마다 
+        # q_(b, i, h, d) * k_(b, j, h, d)이 i*j번 곱해진 후 (b, i, j, h, d) 총 b*h*d*i*j개 (q_id * k_jd)
+        # 여기서 sum over d를 해서 (b, i, j, h) 총 b*i*j*h개 항 (∑_d (q_id * k_jd) == Q@K^T)
+            # torch.einsum 규칙 1) 입력(bihd,bjhd)에만 있고 출력(bijh)에 없는 인덱스(d == d_k)는 sum over 해당 인덱스(d)
+            # torch.einsum 규칙 2) 여러 입력 텐서에서 중복해서 등장하는 인덱스(b,h,d)은 그 인덱스를 기준으로 짝을 맞추어 원소들끼리 곱한다.
+                # q, k 양쪽에서 (b, h, d) 페어 하나당 중복 등장하지 않는 인덱스i 와 인덱스j가 있으므로 i*j 번 곱셈
+            # ex: torch.einsum('ij,ij->ij', A, B) == 아다마르 곱(Element-wise Multiplication)
+            # ex: torch.einsum('ij,jk->ik', A, B) == 행렬 곱
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
         # Softmax along the sequence dimension $\underset{seq}{softmax}\Bigg(\frac{Q K^\top}{\sqrt{d_k}}\Bigg)$
         attn = attn.softmax(dim=2)
+        # dim=1은 query, dim=2는 key
+
         # Multiply by values
         res = torch.einsum('bijh,bjhd->bihd', attn, v)
+        # 입력 텐서 양쪽 모두에 b, j, h 등장
+        # (b, j, h) 순서쌍 하나 마다 i*d번 곱셈 (a_ij * v_jd)
+        # 그 다음 sum over j (∑_j (a_ij * v_jd) == Attn@V)
+
         # Reshape to `[batch_size, seq, n_heads * d_k]`
         res = res.view(batch_size, -1, self.n_heads * self.d_k)
+
         # Transform to `[batch_size, seq, n_channels]`
         res = self.output(res)
 
@@ -208,7 +251,9 @@ class AttentionBlock(nn.Module):
         # Change to shape `[batch_size, in_channels, height, width]`
         res = res.permute(0, 2, 1).view(batch_size, n_channels, height, width)
 
-        #
+        # res는 결국 각 픽셀마다 그 픽셀이 그림 내의 모든 픽셀과 어떤 관계(attention score)에 있는지 계산한 후 
+        # 그 attention score를 이용해 그 픽셀과 연관이 큰 픽셀(자기 자신 포함) 신호들을 합한 결과를 얻는다.
+        # 여기에 최종적으로 원본 x가 더해져서 출력된다. (원본 x에 더해지기 전에 mha 결과는 linear(self.output) 층 한번 통과)
         return res
 
 
