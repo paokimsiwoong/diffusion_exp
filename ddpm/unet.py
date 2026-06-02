@@ -218,16 +218,25 @@ class AttentionBlock(nn.Module):
 
         # Calculate scaled dot-product $\frac{Q K^\top}{\sqrt{d_k}}$
         attn = torch.einsum('bihd,bjhd->bijh', q, k) * self.scale
-        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         # 총 b*h*d개인 (b, h, d) 순서쌍 하나 마다 
         # q_(b, i, h, d) * k_(b, j, h, d)이 i*j번 곱해진 후 (b, i, j, h, d) 총 b*h*d*i*j개 (q_id * k_jd)
         # 여기서 sum over d를 해서 (b, i, j, h) 총 b*i*j*h개 항 (∑_d (q_id * k_jd) == Q@K^T)
-            # torch.einsum 규칙 1) 입력(bihd,bjhd)에만 있고 출력(bijh)에 없는 인덱스(d == d_k)는 sum over 해당 인덱스(d)
-            # torch.einsum 규칙 2) 여러 입력 텐서에서 중복해서 등장하는 인덱스(b,h,d)은 그 인덱스를 기준으로 짝을 맞추어 원소들끼리 곱한다.
-                # q, k 양쪽에서 (b, h, d) 페어 하나당 중복 등장하지 않는 인덱스i 와 인덱스j가 있으므로 i*j 번 곱셈
-            # ex: torch.einsum('ij,ij->ij', A, B) == 아다마르 곱(Element-wise Multiplication)
-            # ex: torch.einsum('ij,jk->ik', A, B) == 행렬 곱
-        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            # q (b1, i, h1, d1), k (b2, j, h2, d2)로 b, h, d가 중복 등장하지 않을 경우, 
+            # q 원소 각각에 k의 원소 전부가 곱해지므로(outer(tensor) product) b1 * i * h1 * d1 * b2 * j * h2 * d2 개의 원소가 있지만,
+            # b, h, d로 짝을 이루면 b, h, d가 같은 원소들끼리만 곱을 하므로 q의 원소 하나당 k의 원소 j개가 곱해진다.
+            # q의 원소가 총 b * i * h * d 개 이므로 곱해진 결과에는 b * i * j * h * d 개의 원소가 있다.
+            # 여기서 출력에서 생략된 d 차원을 따라서 summation을 진행하면 b * i * j * h 개의 원소가 남는다.
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        # torch.einsum : 지정된 차원을 따라 입력 피연산자(operands) 요소들의 곱의 합을 구한다.
+        # torch.einsum 규칙 1) 입력(bihd,bjhd)에만 있고 출력(bijh)에 없는 인덱스(d == d_k)는 해당 인덱스(d) 차원을 따라서 모두 더한다(sum over d).
+        # torch.einsum 규칙 2) 여러 입력 텐서에서 중복해서 등장하는 인덱스(b,h,d)은 그 인덱스를 기준으로 짝을 맞추어 원소들끼리 곱한다.
+            # @@@ 입력 텐서들에 중복 등장하는 인덱스가 없어도 입력 텐서 요소들의 곱(element-wise 곱)은 무조건 진행(밑의 outer product 예시 확인)
+        # ex: torch.einsum('ij,ij->ij', A, B) == 아다마르 곱(Matrix Element-wise Multiplication)
+        # ex: torch.einsum('ij,jk->ik', A, B) == 행렬 곱
+        # ex: torch.einsum('i,j->ij', a, b) == outer product
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
 
         # Softmax along the sequence dimension $\underset{seq}{softmax}\Bigg(\frac{Q K^\top}{\sqrt{d_k}}\Bigg)$
         attn = attn.softmax(dim=2)
