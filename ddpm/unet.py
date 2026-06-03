@@ -165,6 +165,12 @@ class AttentionBlock(nn.Module):
         """
         * `n_channels` is the number of channels in the input
         * `n_heads` is the number of heads in multi-head attention
+            DDPM 원 논문과 nn.labml.ai 코드 구현은 n_heads == 1로 고정
+                @@@ nn.labml.ai 코드는 한개의 해상도에서만 attention block을 사용한 DDPM 원 논문과 다르게
+                @@@ Improved Denoising Diffusion Probabilistic Models 논문의 개선된 모델처럼 
+                @@@ attention block을 두개의 해상도 영역에서 사용한다. 
+                @@@ 그렇지만 Improved Denoising Diffusion Probabilistic Models 의 개선된 모델처럼 head를 4로 쓰지 않고 있다. 
+                @@@ TODO: ==> n_heads == 4로 변경해볼 것
         * `d_k` is the number of dimensions in each head
         * `n_groups` is the number of groups for group normalization (https://nn.labml.ai/normalization/group_norm/index.html)
         """
@@ -187,7 +193,7 @@ class AttentionBlock(nn.Module):
             # ==> [batch_size, seq, n_heads * d_k * 3]
             # view로 [batch_size, seq, n_heads, d_k * 3]로 변경
             # chunk로 [batch_size, seq, n_heads, d_k]인 q, k, v로 분해
-            # (transformer의 mha와 다르게 [batch_size, n_heads, seq, d_k]로 permute 안하고 einsum으로 해결)
+            # ([batch_size, n_heads, seq, d_k]로 permute 안하고 einsum으로 attention score 연산 해결)
 
 
         # Linear layer for final transformation
@@ -256,6 +262,7 @@ class AttentionBlock(nn.Module):
 
         # Add skip connection
         res += x
+        # x는 [batch_size, seq, n_channels] 형태로 위에서 변경된 상태이므로 res에 바로 더해질 수 있음
 
         # Change to shape `[batch_size, in_channels, height, width]`
         res = res.permute(0, 2, 1).view(batch_size, n_channels, height, width)
@@ -331,22 +338,6 @@ class MiddleBlock(nn.Module):
         return x
 
 
-class Upsample(nn.Module):
-    """
-    ### Scale up the feature map by $2 \times$
-    """
-
-    def __init__(self, n_channels):
-        super().__init__()
-        self.conv = nn.ConvTranspose2d(n_channels, n_channels, (4, 4), (2, 2), (1, 1))
-
-    def forward(self, x: torch.Tensor, t: torch.Tensor):
-        # `t` is not used, but it's kept in the arguments because for the attention layer function signature
-        # to match with `ResidualBlock`.
-        _ = t
-        return self.conv(x)
-
-
 class Downsample(nn.Module):
     """
     ### Scale down the feature map by $\frac{1}{2} \times$
@@ -355,6 +346,24 @@ class Downsample(nn.Module):
     def __init__(self, n_channels):
         super().__init__()
         self.conv = nn.Conv2d(n_channels, n_channels, (3, 3), (2, 2), (1, 1))
+        # out_len = 1 + 버림((in_len + 2 * padding - kernel_size)/stride)
+
+    def forward(self, x: torch.Tensor, t: torch.Tensor):
+        # `t` is not used, but it's kept in the arguments because for the attention layer function signature
+        # to match with `ResidualBlock`.
+        _ = t
+        return self.conv(x)
+
+
+class Upsample(nn.Module):
+    """
+    ### Scale up the feature map by $2 \times$
+    """
+
+    def __init__(self, n_channels):
+        super().__init__()
+        self.conv = nn.ConvTranspose2d(n_channels, n_channels, (4, 4), (2, 2), (1, 1))
+        # out_len = (in_len - 1) * stride - 2 * padding + kernel_size
 
     def forward(self, x: torch.Tensor, t: torch.Tensor):
         # `t` is not used, but it's kept in the arguments because for the attention layer function signature
@@ -370,7 +379,7 @@ class UNet(nn.Module):
 
     def __init__(self, image_channels: int = 3, n_channels: int = 64,
                  ch_mults: Union[Tuple[int, ...], List[int]] = (1, 2, 2, 4),
-                 is_attn: Union[Tuple[bool, ...], List[bool]] = (False, False, True, True),
+                 is_attn: Union[Tuple[bool, ...], List[bool]] = (False, False, True, True), # 고 해상도일 때는 연산이 비싼 attention 미사용 @@@ DDPM 원 논문은 attention을 한개의 해상도에서만 사용
                  n_blocks: int = 2):
         """
         * `image_channels` is the number of channels in the image. $3$ for RGB.
@@ -389,6 +398,9 @@ class UNet(nn.Module):
 
         # Time embedding layer. Time embedding has `n_channels * 4` channels
         self.time_emb = TimeEmbedding(n_channels * 4)
+        # [batch_size, time_channels == n_channels * 4]
+        # ch_mults가 (1, 2, 2, 4)로 최대 n_channels * 4 까지 채널 수가 늘어나므로 
+        # TimeEmbedding은 최대치에 맞추고 각 층에서 linear를 한번 더 통과 시켜 각자의 채널 수에 맞게 채널 수를 조정한다.
 
         # #### First half of U-Net - decreasing resolution
         down = []
@@ -398,6 +410,8 @@ class UNet(nn.Module):
         for i in range(n_resolutions):
             # Number of output channels at this resolution
             out_channels = in_channels * ch_mults[i]
+            # ch_mults == (1, 2, 2, 4)
+
             # Add `n_blocks`
             for _ in range(n_blocks):
                 down.append(DownBlock(in_channels, out_channels, n_channels * 4, is_attn[i]))
