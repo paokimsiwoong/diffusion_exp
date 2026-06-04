@@ -58,7 +58,7 @@ class TimeEmbedding(nn.Module):
 
         # 10000^(i/(d-1)) == e^(log10000 * i /(d-1))
         emb = math.log(10_000) / (half_dim - 1)
-        # i/(d-1)에서 i ∈ [0, d) 이므로 분모도 d-1로 두어서 
+        # i/(d-1): i ∈ [0, d) 이므로 분모도 d-1로 두어서 
         # i가 최대일때 분수 값이 1이 되도록 설정
 
         emb = torch.exp(torch.arange(half_dim, device=t.device) * -emb)
@@ -340,7 +340,7 @@ class MiddleBlock(nn.Module):
 
 class Downsample(nn.Module):
     """
-    ### Scale down the feature map by $\frac{1}{2} \times$
+    ### Scale down the feature map by 1/2 
     """
 
     def __init__(self, n_channels):
@@ -357,7 +357,7 @@ class Downsample(nn.Module):
 
 class Upsample(nn.Module):
     """
-    ### Scale up the feature map by $2 \times$
+    ### Scale up the feature map by 2
     """
 
     def __init__(self, n_channels):
@@ -375,6 +375,10 @@ class Upsample(nn.Module):
 class UNet(nn.Module):
     """
     ## U-Net
+    @@@ 여기서 구현되는 UNet은 원본 UNet보다는 PixelCNN++에 기반한 Wide ResNet 구조에 가깝다
+    @@@ 따라서 각 해상도에서 한번씩만 concat을 하는 구조가 아니라
+    @@@ 전반부의 모든 모듈 결과 피처 맵들을 저장해
+    @@@ 후반부에서 그 모든 피처맵에 대해 concat을 진행한다.
     """
 
     def __init__(self, image_channels: int = 3, n_channels: int = 64,
@@ -400,7 +404,8 @@ class UNet(nn.Module):
         self.time_emb = TimeEmbedding(n_channels * 4)
         # [batch_size, time_channels == n_channels * 4]
         # ch_mults가 (1, 2, 2, 4)로 최대 n_channels * 4 까지 채널 수가 늘어나므로 
-        # TimeEmbedding은 최대치에 맞추고 각 층에서 linear를 한번 더 통과 시켜 각자의 채널 수에 맞게 채널 수를 조정한다.
+        # TimeEmbedding은 최대치(n_channels * 4)에 맞추어 최대한 복잡하고 풍부한 시간 정보를 가지는 고차원 벡터로 변환해두고
+        # 각 층에서 linear를 한번 더 통과 시켜 각자의 채널 수에 맞게 채널 수를 조정한다.
 
         # #### First half of U-Net - decreasing resolution
         down = []
@@ -409,22 +414,41 @@ class UNet(nn.Module):
         # For each resolution
         for i in range(n_resolutions):
             # Number of output channels at this resolution
-            out_channels = in_channels * ch_mults[i]
+            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            # out_channels = in_channels * ch_mults[i]
+            # 26.06.05 기준 https://nn.labml.ai/diffusion/ddpm/unet.html 코드 오류
+                # 누적 곱을 하면 최종 채널 수가 n_channels * 4 가 아니라 n_channels * 16이 되버린다.
+            # in_channels이 아니라 n_channels이어야 최종 채널 수가 time embedding 채널 수와 같아진다.
+            out_channels = n_channels * ch_mults[i]
+            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
             # ch_mults == (1, 2, 2, 4)
 
             # Add `n_blocks`
+                # n_blocks == 2
             for _ in range(n_blocks):
+                # 각 해상도마다 DownBlock을 두번 반복
                 down.append(DownBlock(in_channels, out_channels, n_channels * 4, is_attn[i]))
+                # 첫번째 DownBlock은 in_channels에서 out_channels( = n_channels * ch_mults[i])로 채널 수가 증가하고
                 in_channels = out_channels
+                # 두번째 DownBlock은 out_channels으로 채널 수가 고정된 상태에서 연산
+
             # Down sample at all resolutions except the last
-            if i < n_resolutions - 1:
+            if i < n_resolutions - 1: # i가 0, 1, 2일 때 Downsample => 0->1, 1->2, 2->3
                 down.append(Downsample(in_channels))
+            # @@@ down과 middle 사이에는 down sample 없음?
 
         # Combine the set of modules
         self.down = nn.ModuleList(down)
 
         # Middle block
         self.middle = MiddleBlock(out_channels, n_channels * 4, )
+        # residual + attention + residual
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        # MiddleBlock의 두번째 인자는 출력의 채널 수가 아니라 time embedding 채널
+        # ==> MiddleBlock의 입력과 출력의 채널 수는 첫번째 인자 값(out_channels)으로 고정
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        # out_channels은 현재 n_channels * 4 == 256
+            # @@@ 위의 코드 오류 부분을 그대로 둘 경우 n_channels * 16 == 1024
 
         # #### Second half of U-Net - increasing resolution
         up = []
@@ -437,11 +461,32 @@ class UNet(nn.Module):
             for _ in range(n_blocks):
                 up.append(UpBlock(in_channels, out_channels, n_channels * 4, is_attn[i]))
             # Final block to reduce the number of channels
-            out_channels = in_channels // ch_mults[i]
+
+            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            # out_channels = in_channels // ch_mults[i]
+            # 26.06.05 기준 https://nn.labml.ai/diffusion/ddpm/unet.html 코드 오류
+            # 전반부의 누적 곱을 여기서 누적 나눗셈을 해서 코드 자체는 정상적으로 돌아간다.
+            # 전반부의 누적 곱을 지우면 이 곳도 수정 필수
+            if i > 0:
+                out_channels = n_channels * ch_mults[i-1]
+                # TODO: 채널 스택 방식으로 바꾸기
+            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
             up.append(UpBlock(in_channels, out_channels, n_channels * 4, is_attn[i]))
             in_channels = out_channels
+            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            # 각 해상도에서 DownBlock이 두번만 있었는데 UpBlock은 3번 있는 이유
+                # 원본 UNet
+                    # 전반부의 각 해상도에서 Conv 연산을 2번하고 다운샘플링 직전의 피처 맵 한개만 저장해서 
+                    # 후반부 해당 해상도에서 저장한 피처 맵을 concat 한번만 진행
+                # DDPM UNet (PixelCNN++에 기반한 Wide ResNet 구조)
+                    # 전반부의 각 해상도에서 DownBlock을 거칠 때마다 결과 피처 맵을 저장하고, Downsample을 거친 결과 피처맵도 저장해서 총 3개의 피처 맵이 저장된다.
+                    # 이 저장된 3개의 피처 맵을 후반부 해당 해상도에서 각각의 UpBlock에 같이 입력해서 concat 후 연산을 진행하므로 UpBlock이 3개 필요하다.
+            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
             # Up sample at all resolutions except last
-            if i > 0:
+            if i > 0: # i가 3, 2, 1일 때 Upsample 추가 => 3->2, 2->1, 1->0 3번.
                 up.append(Upsample(in_channels))
 
         # Combine the set of modules
@@ -463,6 +508,7 @@ class UNet(nn.Module):
 
         # Get image projection
         x = self.image_proj(x)
+        # RGB 3채널에서 n_channels 64채널로 채널 수 증가
 
         # `h` will store outputs at each resolution for skip connection
         h = [x]
@@ -482,7 +528,7 @@ class UNet(nn.Module):
                 # Get the skip connection from first half of U-Net and concatenate
                 s = h.pop()
                 x = torch.cat((x, s), dim=1)
-                #
+                # x와 s 모두 [batch_size, channels, height, width] 형태 => channels(dim=1) 기준으로 concat해서 channel 개수 증가
                 x = m(x, t)
 
         # Final normalization and convolution
