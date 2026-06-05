@@ -379,6 +379,21 @@ class UNet(nn.Module):
     @@@ 따라서 각 해상도에서 한번씩만 concat을 하는 구조가 아니라
     @@@ 전반부의 모든 모듈 결과 피처 맵들을 저장해
     @@@ 후반부에서 그 모든 피처맵에 대해 concat을 진행한다.
+
+    image_proj: (3, n_channels)
+    
+    0 : DownBlock(n_channels, n_channels)         DownBlock(n_channels, n_channels)         Downsample(n_channels, n_channels) 
+    1 : DownBlock(n_channels, 2 * n_channels)     DownBlock(2 * n_channels, 2 * n_channels) Downsample(2 * n_channels, 2 * n_channels) 
+    2 : DownBlock(2 * n_channels, 2 * n_channels) DownBlock(2 * n_channels, 2 * n_channels) Downsample(2 * n_channels, 2 * n_channels) 
+    3 : DownBlock(2 * n_channels, 4 * n_channels) DownBlock(4 * n_channels, 4 * n_channels)
+    
+    middle : MiddleBlock(4 * n_channels, 4 * n_channels)
+    
+    3 : UpBlock(4 * n_channels, 4 * n_channels) UpBlock(4 * n_channels, 4 * n_channels) UpBlock(4 * n_channels, 2 * n_channels) Upsample(2 * n_channels, 2 * n_channels)
+    2 : UpBlock(2 * n_channels, 2 * n_channels) UpBlock(2 * n_channels, 2 * n_channels) UpBlock(2 * n_channels, 2 * n_channels) Upsample(2 * n_channels, 2 * n_channels)
+    1 : UpBlock(2 * n_channels, 2 * n_channels) UpBlock(2 * n_channels, 2 * n_channels) UpBlock(2 * n_channels, n_channels)     Upsample(n_channels, n_channels)
+    0 : UpBlock(n_channels, n_channels)         UpBlock(n_channels, n_channels)         UpBlock(n_channels, n_channels)
+
     """
 
     def __init__(self, image_channels: int = 3, n_channels: int = 64,
@@ -406,9 +421,17 @@ class UNet(nn.Module):
         # ch_mults가 (1, 2, 2, 4)로 최대 n_channels * 4 까지 채널 수가 늘어나므로 
         # TimeEmbedding은 최대치(n_channels * 4)에 맞추어 최대한 복잡하고 풍부한 시간 정보를 가지는 고차원 벡터로 변환해두고
         # 각 층에서 linear를 한번 더 통과 시켜 각자의 채널 수에 맞게 채널 수를 조정한다.
+            # 이 코드 구현을 포함해 많은 경우 sinusoidal(sin/cos) time embedding의 차원수는 n_channels으로 두지만, 
+            # 채널 수가 작으면 표현력이 제한이므로 linear layer 등을 사용해 차원 수를 크게 늘리고 활성함수를 사용해 비선형성을 추가해준다.
+        # 사실 TimeEmbedding의 채널 수는 n_channels, 2 * n_channels, 4 * n_channels, 8 * n_channels, .... 자유롭게 설정해도 성능에 큰차이가 없고,
+        # 관례적으로 time_channels >= max_channel이 되는 4 * n_channels를 많이 쓴다.
 
         # #### First half of U-Net - decreasing resolution
         down = []
+
+        # 전반부 채널 수 기록 후 후반부에 사용
+        channel_stack = [n_channels]
+
         # Number of channels
         out_channels = in_channels = n_channels
         # For each resolution
@@ -428,14 +451,23 @@ class UNet(nn.Module):
             for _ in range(n_blocks):
                 # 각 해상도마다 DownBlock을 두번 반복
                 down.append(DownBlock(in_channels, out_channels, n_channels * 4, is_attn[i]))
-                # 첫번째 DownBlock은 in_channels에서 out_channels( = n_channels * ch_mults[i])로 채널 수가 증가하고
+                # 첫번째 DownBlock은 in_channels에서 out_channels( = n_channels * ch_mults[i])로 채널 수가 증가
+
                 in_channels = out_channels
                 # 두번째 DownBlock은 out_channels으로 채널 수가 고정된 상태에서 연산
 
+                channel_stack.append(in_channels)
+                # 채널 수 기록
+                    # DownBlock 출력이 concat되는 UpBlock의 out_channels은 DownBlock 출력 channels과 같아야 한다.
+
+
             # Down sample at all resolutions except the last
             if i < n_resolutions - 1: # i가 0, 1, 2일 때 Downsample => 0->1, 1->2, 2->3
+            # @@@ down과 middle 사이에는 down sample 없는 구조
                 down.append(Downsample(in_channels))
-            # @@@ down과 middle 사이에는 down sample 없음?
+
+                channel_stack.append(in_channels)
+                # 채널 수 기록
 
         # Combine the set of modules
         self.down = nn.ModuleList(down)
@@ -456,24 +488,32 @@ class UNet(nn.Module):
         in_channels = out_channels
         # For each resolution
         for i in reversed(range(n_resolutions)):
-            # `n_blocks` at the same resolution
-            out_channels = in_channels
-            for _ in range(n_blocks):
+            # # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            # # `n_blocks` at the same resolution
+            # out_channels = in_channels
+            # for _ in range(n_blocks):
+            #     up.append(UpBlock(in_channels, out_channels, n_channels * 4, is_attn[i]))
+            # # Final block to reduce the number of channels
+
+            # # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            # # out_channels = in_channels // ch_mults[i]
+            # # 26.06.05 기준 https://nn.labml.ai/diffusion/ddpm/unet.html 코드 오류
+            # # 전반부의 누적 곱을 여기서 누적 나눗셈을 해서 코드 자체는 정상적으로 돌아간다.
+            # # 전반부의 누적 곱을 지우면 이 곳도 수정 필수
+            # if i > 0:
+            #     out_channels = n_channels * ch_mults[i-1]
+            # # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+            # up.append(UpBlock(in_channels, out_channels, n_channels * 4, is_attn[i]))
+            # in_channels = out_channels
+
+            # @@@ 전반부 채널 스택 사용하는 코드로 변경
+            for _ in range(n_blocks + 1):
+                out_channels = channel_stack.pop()
                 up.append(UpBlock(in_channels, out_channels, n_channels * 4, is_attn[i]))
-            # Final block to reduce the number of channels
+                in_channels = out_channels
+            # # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-            # out_channels = in_channels // ch_mults[i]
-            # 26.06.05 기준 https://nn.labml.ai/diffusion/ddpm/unet.html 코드 오류
-            # 전반부의 누적 곱을 여기서 누적 나눗셈을 해서 코드 자체는 정상적으로 돌아간다.
-            # 전반부의 누적 곱을 지우면 이 곳도 수정 필수
-            if i > 0:
-                out_channels = n_channels * ch_mults[i-1]
-                # TODO: 채널 스택 방식으로 바꾸기
-            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-
-            up.append(UpBlock(in_channels, out_channels, n_channels * 4, is_attn[i]))
-            in_channels = out_channels
             # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
             # 각 해상도에서 DownBlock이 두번만 있었는데 UpBlock은 3번 있는 이유
                 # 원본 UNet
@@ -482,6 +522,7 @@ class UNet(nn.Module):
                 # DDPM UNet (PixelCNN++에 기반한 Wide ResNet 구조)
                     # 전반부의 각 해상도에서 DownBlock을 거칠 때마다 결과 피처 맵을 저장하고, Downsample을 거친 결과 피처맵도 저장해서 총 3개의 피처 맵이 저장된다.
                     # 이 저장된 3개의 피처 맵을 후반부 해당 해상도에서 각각의 UpBlock에 같이 입력해서 concat 후 연산을 진행하므로 UpBlock이 3개 필요하다.
+                        # @@@ 전반부 진입 직전의 최초 피처 맵(self.image_proj(원본 이미지))도 가장 먼저 저장되어 마지막 UpBlock에 concat되어 들어간다.
             # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 
@@ -512,16 +553,20 @@ class UNet(nn.Module):
 
         # `h` will store outputs at each resolution for skip connection
         h = [x]
+        # 최초 피처맵도 저장되어 마지막 UpBlock에 concat된다.
+
         # First half of U-Net
-        for m in self.down:
+        for m in self.down: # self.down에는 DownBlock 8개, Downsample 3개가 들어 있다.
             x = m(x, t)
             h.append(x)
+            # DownBlock과 Downsample을 거친 모든 피처 맵 저장
+        # h에는 총 12개의 피처 맵이 저장된다.
 
         # Middle (bottom)
         x = self.middle(x, t)
 
         # Second half of U-Net
-        for m in self.up:
+        for m in self.up: # self.up에는 UpBlock 12개, Upsample 3개가 들어 있다.
             if isinstance(m, Upsample):
                 x = m(x, t)
             else:
