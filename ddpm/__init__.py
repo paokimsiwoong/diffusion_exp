@@ -1,163 +1,5 @@
 """
----
-title: Denoising Diffusion Probabilistic Models (DDPM)
-summary: >
-  PyTorch implementation and tutorial of the paper
-  Denoising Diffusion Probabilistic Models (DDPM).
----
-
-# Denoising Diffusion Probabilistic Models (DDPM)
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/labmlai/annotated_deep_learning_paper_implementations/blob/master/labml_nn/diffusion/ddpm/experiment.ipynb)
-
-This is a [PyTorch](https://pytorch.org) implementation/tutorial of the paper
-[Denoising Diffusion Probabilistic Models](https://arxiv.org/abs/2006.11239).
-
-In simple terms, we get an image from data and add noise step by step.
-Then We train a model to predict that noise at each step and use the model to
-generate images.
-
-The following definitions and derivations show how this works.
-For details please refer to [the paper](https://arxiv.org/abs/2006.11239).
-
-## Forward Process
-
-The forward process adds noise to the data $x_0 \sim q(x_0)$, for $T$ timesteps.
-
-\begin{align}
-q(x_t | x_{t-1}) = \mathcal{N}\big(x_t; \sqrt{1-  \beta_t} x_{t-1}, \beta_t \mathbf{I}\big) \\
-q(x_{1:T} | x_0) = \prod_{t = 1}^{T} q(x_t | x_{t-1})
-\end{align}
-
-where $\beta_1, \dots, \beta_T$ is the variance schedule.
-
-We can sample $x_t$ at any timestep $t$ with,
-
-\begin{align}
-q(x_t|x_0) &= \mathcal{N} \Big(x_t; \sqrt{\bar\alpha_t} x_0, (1-\bar\alpha_t) \mathbf{I} \Big)
-\end{align}
-
-where $\alpha_t = 1 - \beta_t$ and $\bar\alpha_t = \prod_{s=1}^t \alpha_s$
-
-## Reverse Process
-
-The reverse process removes noise starting at $p(x_T) = \mathcal{N}(x_T; \mathbf{0}, \mathbf{I})$
-for $T$ time steps.
-
-\begin{align}
-\textcolor{lightgreen}{p_\theta}(x_{t-1} | x_t) &= \mathcal{N}\big(x_{t-1};
- \textcolor{lightgreen}{\mu_\theta}(x_t, t), \textcolor{lightgreen}{\Sigma_\theta}(x_t, t)\big) \\
-\textcolor{lightgreen}{p_\theta}(x_{0:T}) &= \textcolor{lightgreen}{p_\theta}(x_T) \prod_{t = 1}^{T} \textcolor{lightgreen}{p_\theta}(x_{t-1} | x_t) \\
-\textcolor{lightgreen}{p_\theta}(x_0) &= \int \textcolor{lightgreen}{p_\theta}(x_{0:T}) dx_{1:T}
-\end{align}
-
-$\textcolor{lightgreen}\theta$ are the parameters we train.
-
-## Loss
-
-We optimize the ELBO (from Jenson's inequality) on the negative log likelihood.
-
-\begin{align}
-\mathbb{E}[-\log \textcolor{lightgreen}{p_\theta}(x_0)]
- &\le \mathbb{E}_q [ -\log \frac{\textcolor{lightgreen}{p_\theta}(x_{0:T})}{q(x_{1:T}|x_0)} ] \\
- &=L
-\end{align}
-
-The loss can be rewritten as  follows.
-
-\begin{align}
-L
- &= \mathbb{E}_q [ -\log \frac{\textcolor{lightgreen}{p_\theta}(x_{0:T})}{q(x_{1:T}|x_0)} ] \\
- &= \mathbb{E}_q [ -\log p(x_T) - \sum_{t=1}^T \log \frac{\textcolor{lightgreen}{p_\theta}(x_{t-1}|x_t)}{q(x_t|x_{t-1})} ] \\
- &= \mathbb{E}_q [
-  -\log \frac{p(x_T)}{q(x_T|x_0)}
-  -\sum_{t=2}^T \log \frac{\textcolor{lightgreen}{p_\theta}(x_{t-1}|x_t)}{q(x_{t-1}|x_t,x_0)}
-  -\log \textcolor{lightgreen}{p_\theta}(x_0|x_1)] \\
- &= \mathbb{E}_q [
-   D_{KL}(q(x_T|x_0) \Vert p(x_T))
-  +\sum_{t=2}^T D_{KL}(q(x_{t-1}|x_t,x_0) \Vert \textcolor{lightgreen}{p_\theta}(x_{t-1}|x_t))
-  -\log \textcolor{lightgreen}{p_\theta}(x_0|x_1)]
-\end{align}
-
-$D_{KL}(q(x_T|x_0) \Vert p(x_T))$ is constant since we keep $\beta_1, \dots, \beta_T$ constant.
-
-### Computing $L_{t-1} = D_{KL}(q(x_{t-1}|x_t,x_0) \Vert \textcolor{lightgreen}{p_\theta}(x_{t-1}|x_t))$
-
-The forward process posterior conditioned by $x_0$ is,
-
-\begin{align}
-q(x_{t-1}|x_t, x_0) &= \mathcal{N} \Big(x_{t-1}; \tilde\mu_t(x_t, x_0), \tilde\beta_t \mathbf{I} \Big) \\
-\tilde\mu_t(x_t, x_0) &= \frac{\sqrt{\bar\alpha_{t-1}}\beta_t}{1 - \bar\alpha_t}x_0
-                         + \frac{\sqrt{\alpha_t}(1 - \bar\alpha_{t-1})}{1-\bar\alpha_t}x_t \\
-\tilde\beta_t &= \frac{1 - \bar\alpha_{t-1}}{1 - \bar\alpha_t} \beta_t
-\end{align}
-
-The paper sets $\textcolor{lightgreen}{\Sigma_\theta}(x_t, t) = \sigma_t^2 \mathbf{I}$ where $\sigma_t^2$ is set to constants
-$\beta_t$ or $\tilde\beta_t$.
-
-Then,
-$$\textcolor{lightgreen}{p_\theta}(x_{t-1} | x_t) = \mathcal{N}\big(x_{t-1}; \textcolor{lightgreen}{\mu_\theta}(x_t, t), \sigma_t^2 \mathbf{I} \big)$$
-
-For given noise $\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ using $q(x_t|x_0)$
-
-\begin{align}
-x_t(x_0, \epsilon) &= \sqrt{\bar\alpha_t} x_0 + \sqrt{1-\bar\alpha_t}\epsilon \\
-x_0 &= \frac{1}{\sqrt{\bar\alpha_t}} \Big(x_t(x_0, \epsilon) -  \sqrt{1-\bar\alpha_t}\epsilon\Big)
-\end{align}
-
-This gives,
-
-\begin{align}
-L_{t-1}
- &= D_{KL}(q(x_{t-1}|x_t,x_0) \Vert \textcolor{lightgreen}{p_\theta}(x_{t-1}|x_t)) \\
- &= \mathbb{E}_q \Bigg[ \frac{1}{2\sigma_t^2}
- \Big \Vert \tilde\mu(x_t, x_0) - \textcolor{lightgreen}{\mu_\theta}(x_t, t) \Big \Vert^2 \Bigg] \\
- &= \mathbb{E}_{x_0, \epsilon} \Bigg[ \frac{1}{2\sigma_t^2}
-  \bigg\Vert \frac{1}{\sqrt{\alpha_t}} \Big(
-  x_t(x_0, \epsilon) - \frac{\beta_t}{\sqrt{1 - \bar\alpha_t}} \epsilon
-  \Big) - \textcolor{lightgreen}{\mu_\theta}(x_t(x_0, \epsilon), t) \bigg\Vert^2 \Bigg] \\
-\end{align}
-
-Re-parameterizing with a model to predict noise
-
-\begin{align}
-\textcolor{lightgreen}{\mu_\theta}(x_t, t) &= \tilde\mu \bigg(x_t,
-  \frac{1}{\sqrt{\bar\alpha_t}} \Big(x_t -
-   \sqrt{1-\bar\alpha_t}\textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big) \bigg) \\
-  &= \frac{1}{\sqrt{\alpha_t}} \Big(x_t -
-  \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big)
-\end{align}
-
-where $\epsilon_\theta$ is a learned function that predicts $\epsilon$ given $(x_t, t)$.
-
-This gives,
-
-\begin{align}
-L_{t-1}
-&= \mathbb{E}_{x_0, \epsilon} \Bigg[ \frac{\beta_t^2}{2\sigma_t^2 \alpha_t (1 - \bar\alpha_t)}
-  \Big\Vert
-  \epsilon - \textcolor{lightgreen}{\epsilon_\theta}(\sqrt{\bar\alpha_t} x_0 + \sqrt{1-\bar\alpha_t}\epsilon, t)
-  \Big\Vert^2 \Bigg]
-\end{align}
-
-That is, we are training to predict the noise.
-
-### Simplified loss
-
-$$L_{\text{simple}}(\theta) = \mathbb{E}_{t,x_0, \epsilon} \Bigg[ \bigg\Vert
-\epsilon - \textcolor{lightgreen}{\epsilon_\theta}(\sqrt{\bar\alpha_t} x_0 + \sqrt{1-\bar\alpha_t}\epsilon, t)
-\bigg\Vert^2 \Bigg]$$
-
-This minimizes $-\log \textcolor{lightgreen}{p_\theta}(x_0|x_1)$ when $t=1$ and $L_{t-1}$ for $t\gt1$ discarding the
-weighting in $L_{t-1}$. Discarding the weights $\frac{\beta_t^2}{2\sigma_t^2 \alpha_t (1 - \bar\alpha_t)}$
-increase the weight given to higher $t$ (which have higher noise levels), therefore increasing the sample quality.
-
-This file implements the loss calculation and a basic sampling method that we use to generate images during
-training.
-
-Here is the [UNet model](unet.html) that gives $\textcolor{lightgreen}{\epsilon_\theta}(x_t, t)$ and
-[training code](experiment.html).
-[This file](evaluate.html) can generate samples and interpolations from a trained model.
+출처: https://nn.labml.ai/diffusion/ddpm/index.html
 """
 from typing import Tuple, Optional
 
@@ -166,7 +8,7 @@ import torch.nn.functional as F
 import torch.utils.data
 from torch import nn
 
-from labml_nn.diffusion.ddpm.utils import gather
+from utils import gather
 
 
 class DenoiseDiffusion:
@@ -177,7 +19,7 @@ class DenoiseDiffusion:
     def __init__(self, eps_model: nn.Module, n_steps: int, device: torch.device):
         """
         * `eps_model` is $\textcolor{lightgreen}{\epsilon_\theta}(x_t, t)$ model
-        * `n_steps` is $t$
+        * `n_steps` is $T$
         * `device` is the device to place constants on
         """
         super().__init__()
@@ -185,15 +27,24 @@ class DenoiseDiffusion:
 
         # Create $\beta_1, \dots, \beta_T$ linearly increasing variance schedule
         self.beta = torch.linspace(0.0001, 0.02, n_steps).to(device)
+        # DDPM 원논문과 동일하게 β_1은 10^-4, β_T 는 0.02로 설정
 
         # $\alpha_t = 1 - \beta_t$
         self.alpha = 1. - self.beta
+
         # $\bar\alpha_t = \prod_{s=1}^t \alpha_s$
         self.alpha_bar = torch.cumprod(self.alpha, dim=0)
+        # torch.cumprod는 (x_0, x_1, x_2, ..., x_i, ...)인 벡터를 받으면
+        # (x_0, x_0*x_1, x_0*x_1*x_2, ..., x_0*x_1*....*x_i, ...)를 반환
+
         # $T$
         self.n_steps = n_steps
+
         # $\sigma^2 = \beta$
         self.sigma2 = self.beta
+        # 이 σ^2은 q(x_t | x_{t-1})의 분산 
+            # q(x_t | x_{t-1})는 평균이 √α_t * x_{t-1}이고 분산이 (1-α_t)I 인 isotropic Gaussian
+            # 1-α_t = β_t
 
     def q_xt_x0(self, x0: torch.Tensor, t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -226,8 +77,11 @@ class DenoiseDiffusion:
 
         # get $q(x_t|x_0)$
         mean, var = self.q_xt_x0(x0, t)
+
         # Sample from $q(x_t|x_0)$
         return mean + (var ** 0.5) * eps
+        # x ~ q(x_t|x_0) 이고 q(x_t|x_0)는 평균이 μ, 분산이 σ^2인 isotropic Gaussian
+        # ==> x = μ + σ * ε
 
     def p_sample(self, xt: torch.Tensor, t: torch.Tensor):
         """
@@ -238,23 +92,57 @@ class DenoiseDiffusion:
         \textcolor{lightgreen}{\mu_\theta}(x_t, t), \sigma_t^2 \mathbf{I} \big) \\
         \textcolor{lightgreen}{\mu_\theta}(x_t, t)
           &= \frac{1}{\sqrt{\alpha_t}} \Big(x_t -
-            \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big)
+            \frac{1 - \alpha_t}{\sqrt{1-\bar\alpha_t}}\textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big)
         \end{align}
         """
 
         # $\textcolor{lightgreen}{\epsilon_\theta}(x_t, t)$
         eps_theta = self.eps_model(xt, t)
-        # [gather](utils.html) $\bar\alpha_t$
+
+        # gather $\bar\alpha_t$
         alpha_bar = gather(self.alpha_bar, t)
         # $\alpha_t$
         alpha = gather(self.alpha, t)
-        # $\frac{\beta}{\sqrt{1-\bar\alpha_t}}$
+
+        # $\frac{1 - \alpha_t}{\sqrt{1-\bar\alpha_t}}$
         eps_coef = (1 - alpha) / (1 - alpha_bar) ** .5
+
         # $$\frac{1}{\sqrt{\alpha_t}} \Big(x_t -
-        #      \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big)$$
+        #      \frac{1 - \alpha_t}{\sqrt{1-\bar\alpha_t}}\textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big)$$
         mean = 1 / (alpha ** 0.5) * (xt - eps_coef * eps_theta)
+
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         # $\sigma^2$
         var = gather(self.sigma2, t)
+        # p_θ(x_{t-1} | x_t)는 q(x_t | x_{t-1})가 아니라
+        # q(x_{t-1} | x_t, x_0)를 모델링하므로 
+            # 분산은 t-step 마다 fixed value이므로 모델링할 때 분산 값은 동일하게 설정
+        # q(x_t | x_{t-1})의 분산(β_t == 1-α_t)가 아니라
+        # q(x_{t-1} | x_t, x_0)의 분산 (1-α_t) * (1-\bar\alpha_{t-1}) / (1-\bar\alpha_t)를 써야 하지만
+        # 두 분산은 상수배 차이고 스케일 차이가 거의 없어서 수식적으로 단순한 β_t를 써도 생성된 이미지의 품질에 차이가 없다
+            # 분산 값은 각 t step에서 추가되는 노이즈의 폭(최대치)만 결정하고 β값 자체가 10^-4 ~ 0.02 사이 값으로 매우 작아서 
+            # 두 분산을 바꾸어써도 이미지에 추가되는 노이즈의 스케일 크기 차이가 거의 없다.
+            # DDPM 원 논문을 보면 두 분산 두가지 다 적용해서 실험 후 차이가 없음을 확인함
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        # q(x_t | x_{t-1})의 분산과 q(x_{t-1} | x_t, x_0)의 분산은
+        # 역방향 과정(복원 과정)에서 가질 수 있는 분산의 양극단(상한과 하한)이다.
+        # 상한
+            # β_t는 정방향 과정(노이즈 추가 과정)에서 노이즈를 더할 때 사용한 분산값
+            # q(x_t | x_{t-1})의 분산은 x_0를 모르는 상태에서(x_0가 어떤 사진 이미지인지 단순한 완전 노이즈인지 모름)
+            # 불확실성 최대 -> 복원 최종 결과 x_0를 모르므로 역방향으로 돌아갈 때, 정방향과 같은 크기의 노이즈를 그대로 사용
+            # ==> 모델이 가질 수 있는 가장 큰 분산 값(상한)
+        # 하한
+            # 원본 이미지(x_0)가 무엇인지 완벽하게 알고 있으므로 x_t에서 x_{t-1}로 복원할 때 최종 복원 결과를 알고 있어
+            # 어디로 복원해야 하는지 불확실성이 가장 적다. ==> 이 때의 분산이 모델이 가질 수 있는 가장 작은 분산 값(하한)
+                # (1-\bar\alpha_{t-1}) / (1-\bar\alpha_t) 에서 \bar\alpha_t는 
+                # \bar\alpha_{t-1} * \alpha_t로 \alpha_{t-1} 보다 항상 작다. 
+                # ==> (1-\bar\alpha_{t-1}) / (1-\bar\alpha_t)는 항상 1보다 작다
+                # ==> q(x_{t-1} | x_t, x_0)의 분산은 q(x_t | x_{t-1})의 분산 보다 항상 작다.
+        # 그러나 T = 1000으로 각 t step 간 추가되는 노이즈의 분산 값 차이, \bar\alpha_t와 \bar\alpha_{t-1} 사이 차이가 매우 작아져
+        # 사실상 두 분산의 값은 거의 같아진다.
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
 
         # $\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$
         eps = torch.randn(xt.shape, device=xt.device)

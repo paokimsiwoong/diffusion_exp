@@ -13,7 +13,8 @@ class Swish(nn.Module):
     """
     Swish activation function
 
-    x * sigmoid(x)
+    x * σ(x)
+    σ : sigmoid
     """
 
     def forward(self, x):
@@ -161,14 +162,14 @@ class AttentionBlock(nn.Module):
     transformer MHA와 유사한 형태(https://nn.labml.ai/transformers/mha.html).
     """
 
-    def __init__(self, n_channels: int, n_heads: int = 1, d_k: int = None, n_groups: int = 32):
+    def __init__(self, n_channels: int, n_heads: int = 1, d_k: Optional[int] = None, n_groups: int = 32):
         """
         * `n_channels` is the number of channels in the input
         * `n_heads` is the number of heads in multi-head attention
             DDPM 원 논문과 nn.labml.ai 코드 구현은 n_heads == 1로 고정
                 @@@ nn.labml.ai 코드는 한개의 해상도에서만 attention block을 사용한 DDPM 원 논문과 다르게
                 @@@ Improved Denoising Diffusion Probabilistic Models 논문의 개선된 모델처럼 
-                @@@ attention block을 두개의 해상도 영역에서 사용한다. 
+                @@@ attention block을 여러개의 해상도 영역에서 사용한다. 
                 @@@ 그렇지만 Improved Denoising Diffusion Probabilistic Models 의 개선된 모델처럼 head를 4로 쓰지 않고 있다. 
                 @@@ TODO: ==> n_heads == 4로 변경해볼 것
         * `d_k` is the number of dimensions in each head
