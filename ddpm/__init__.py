@@ -9,6 +9,8 @@ import torch.utils.data
 from torch import nn
 
 from utils import gather
+# gather는 1~T의 값을 모두 가지는 alpha, beta등의 텐서에서 torch.gather 함수로 배치에서 지정된 t step의 값들만 뽑아낸 뒤(1차원)
+# 이미지 텐서와 동일한 dimension(batch, ch, height, width의 4차원)을 가지도록 변경해주는 util 함수
 
 
 class DenoiseDiffusion:
@@ -146,8 +148,10 @@ class DenoiseDiffusion:
 
         # $\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$
         eps = torch.randn(xt.shape, device=xt.device)
+
         # Sample
         return mean + (var ** .5) * eps
+        # x = μ + σ * ε
 
     def loss(self, x0: torch.Tensor, noise: Optional[torch.Tensor] = None):
         """
@@ -156,6 +160,29 @@ class DenoiseDiffusion:
         $$L_{\text{simple}}(\theta) = \mathbb{E}_{t,x_0, \epsilon} \Bigg[ \bigg\Vert
         \epsilon - \textcolor{lightgreen}{\epsilon_\theta}(\sqrt{\bar\alpha_t} x_0 + \sqrt{1-\bar\alpha_t}\epsilon, t)
         \bigg\Vert^2 \Bigg]$$
+
+        원래의 loss의 summation 부분 ∑_{t=2}^T (L_{t-1}) 항은 999개의 L_{t-1}를 계산해야 해서 매우 큰 연산이 필요하다.
+        여기서 ∑_{t=2}^T (L_{t-1})를 (T-1) * ∑_{t=2}^T (1/T-1)*(L_{t-1}) 형태로 바꾸면 (1/T-1)이 U{2,T} 분포의 prob. mass 값이 된다.
+        이렇게 보면 summation을 평균으로 변경 가능해진다.
+        ===> 평균으로 변경하고 나면 배치마다 몬테카를로 샘플링으로 추출된 임의의 t에 대해서만 L_{t-1}을 계산한다.
+        
+        추가로 DDPM 원 논문에서는 근사를 통해 L_0도 L_{t-1}과 동일한 MSE|source noise - pred. noise| 형태로 변경해 
+        t = 2 ~ T 범위를 t = 1 ~ T로 늘려 L_0와 L_{t-1}을 하나의 L_simple로 통합해 버린다.
+
+        + 원래의 loss 항에 있던 가중치(상수 항)을 무시하는데 이렇게 무시를 하면 작은 t step 부근의 L 값을 작게 만든다.
+            ==> 전체 loss에서 큰 t step 부근의 loss 비중이 커지므로 
+                모델이 더 어려운 큰 t step 부근의 노이즈 복원 학습에 더 집중하도록 만든다. 
+                이렇게 하면 상수 항을 무시하지 않고 학습한 모델보다 샘플 품질이 더 좋다.
+        (∵ 상수 항의 분모에 있는 1 - \bar\alpha_{t-1}은 t가 작을 때 \bar\alpha_{t-1} ~ 1 이므로 0에 가까운 값이 된다
+                (α_t = 1 - β_t 이고 t가 작을 때 β ~ 0 & \bar\alpha_t = ∏_1^t α_i로 1 보다 작은 값이 계속 곱해지므로 t가 클수록 \bar\alpha_t이 1에서 0 방향으로 작아진다)
+            => 가중치(상수 항) 값 ~ 무한대
+            ==> t가 작을 때의 가중치가 엄청나게 커져서 모델이 이미 복원이 거의 완료된 상황에 원본과 픽셀 값 1~2 차이 나는 것을 
+            t가 클 때 거의 노이즈인 이미지에서 원본 이미지의 윤곽을 잡는 상황에서의 픽셀이 크게 차이나는 것보다 수천배 더 큰 에러로 받아들인다.
+            ===> 이 항을 1로 바꾸어서 t 값에 따른 크기 변화를 지워버리면 모델이 거의 다 완성된 이미지에서 눈에 보이지 않는 차이를 고치는데 집중하기보다
+            t가 클때의 거의 노이즈인 이미지에서 전체적인 구조와 형태를 스케치하는 복원 과정에 더 집중해서 학습하게 되어 좋은 품질의 이미지 샘플을 생성하게 된다.)
+
+        
+
         """
         # Get batch size
         batch_size = x0.shape[0]
@@ -168,6 +195,7 @@ class DenoiseDiffusion:
 
         # Sample $x_t$ for $q(x_t|x_0)$
         xt = self.q_sample(x0, t, eps=noise)
+        
         # Get $\textcolor{lightgreen}{\epsilon_\theta}(\sqrt{\bar\alpha_t} x_0 + \sqrt{1-\bar\alpha_t}\epsilon, t)$
         eps_theta = self.eps_model(xt, t)
 
