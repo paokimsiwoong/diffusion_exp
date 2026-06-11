@@ -18,6 +18,7 @@ The paper had used a exponential moving average of the model with a decay of $0.
 simplicity.
 """
 from typing import List
+from pathlib import Path
 
 import torchvision
 from PIL import Image
@@ -26,8 +27,8 @@ import torch
 import torch.utils.data
 from labml import lab, tracker, experiment, monit
 from labml.configs import BaseConfigs, option
-from labml_nn.diffusion.ddpm import DenoiseDiffusion
-from labml_nn.diffusion.ddpm.unet import UNet
+from __init__ import DenoiseDiffusion
+from unet import UNet
 from labml_nn.helpers.device import DeviceConfigs
 
 
@@ -159,15 +160,27 @@ class Configs(BaseConfigs):
 class CelebADataset(torch.utils.data.Dataset):
     """
     ### CelebA HQ dataset
+
+    labml.lab을 안쓰는 방향으로 수정
     """
 
-    def __init__(self, image_size: int):
+    def __init__(self, root:str, image_size: int):
         super().__init__()
 
+        # datasets 폴더
+        root_dir = Path(root)
+
         # CelebA images folder
-        folder = lab.get_data_path() / 'celebA'
+        folder = root_dir / 'celebA'
+        # pathlib.Path는 /를 사용해 편하게 경로를 합칠 수 있다.
+            # cf: os.path.join(root_dir, 'celebA')
+
         # List of files
         self._files = [p for p in folder.glob(f'**/*.jpg')]
+        # glob은 폴더 내에서 지정한 패턴에 맞는 파일들을 찾아주는 Path 객체의 메소드
+            # *.jpg는 현재 폴더만 탐색 (폴더 안에 하위 폴더가 있어도 그 하위 폴더 안은 미확인)
+            # */*.jpg는 하위 폴더가 있으면 그 폴더 안의 파일을 탐색 (현재 폴더 안 파일은 무시, 하위 폴더 안에 추가적인 하위 폴더가 있으면 무시)
+            # **/*.jpg는 현재 폴더 안 파일과 모든 깊이의 하위 폴더 전부 탐색 
 
         # Transformations to resize the image and convert to tensor
         self._transform = torchvision.transforms.Compose([
@@ -200,15 +213,20 @@ def celeb_dataset(c: Configs):
 class MNISTDataset(torchvision.datasets.MNIST):
     """
     ### MNIST dataset
+
+    labml.lab을 안쓰는 방향으로 수정
     """
 
-    def __init__(self, image_size):
+    def __init__(self, root:str, image_size):
         transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(image_size),
             torchvision.transforms.ToTensor(),
         ])
 
-        super().__init__(str(lab.get_data_path()), train=True, download=True, transform=transform)
+        # datasets 폴더
+        root_dir = Path(root)
+
+        super().__init__(str(root_dir), train=True, download=True, transform=transform)
 
     def __getitem__(self, item):
         return super().__getitem__(item)[0]
