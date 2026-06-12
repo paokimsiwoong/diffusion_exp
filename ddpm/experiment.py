@@ -31,20 +31,19 @@ from __init__ import DenoiseDiffusion
 from unet import UNet
 from labml_nn.helpers.device import DeviceConfigs
 
+from dataclasses import dataclass, field, asdict
+import yaml
 
-class Configs(BaseConfigs):
-    """
-    ## Configurations
-    """
-    # Device to train the model on.
-    # [`DeviceConfigs`](../../device.html)
-    #  picks up an available CUDA device or defaults to CPU.
-    device: torch.device = DeviceConfigs()
+@dataclass
+class Configs:
 
-    # U-Net model for $\textcolor{lightgreen}{\epsilon_\theta}(x_t, t)$
-    eps_model: UNet
-    # [DDPM algorithm](index.html)
-    diffusion: DenoiseDiffusion
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # dataset 경로
+    root: str = "../datasets"
+    # 실험에 사용할 dataset
+    dataset: str = "celebA"
+    # dataset: str = "MNIST"
 
     # Number of channels in the image. $3$ for RGB.
     image_channels: int = 3
@@ -53,10 +52,14 @@ class Configs(BaseConfigs):
     # Number of channels in the initial feature map
     n_channels: int = 64
     # The list of channel numbers at each resolution.
+
     # The number of channels is `channel_multipliers[i] * n_channels`
-    channel_multipliers: List[int] = [1, 2, 2, 4]
+    channel_multipliers: List[int] = field(default_factory=lambda:[1, 2, 2, 4])
+    # @@@ dataclass는 list와 같은 mutable 바로 default 지정 불가능
+    # @@@ field(default_factory=List)와 같이 기본값을 생성하는 함수를 지정
+
     # The list of booleans that indicate whether to use attention at each resolution
-    is_attention: List[int] = [False, False, False, True]
+    is_attention: List[bool] = field(default_factory=lambda:[False, False, False, True])
 
     # Number of time steps $T$
     n_steps: int = 1_000
@@ -70,37 +73,38 @@ class Configs(BaseConfigs):
     # Number of training epochs
     epochs: int = 1_000
 
-    # Dataset
-    dataset: torch.utils.data.Dataset
-    # Dataloader
-    data_loader: torch.utils.data.DataLoader
-
-    # Adam optimizer
-    optimizer: torch.optim.Adam
-
-    def init(self):
-        # Create $\textcolor{lightgreen}{\epsilon_\theta}(x_t, t)$ model
+class DDPM:
+    def __init__(self, cfg: Configs):
+        self.cfg = cfg
+        # Create ε_θ(x_t, t) model
         self.eps_model = UNet(
-            image_channels=self.image_channels,
-            n_channels=self.n_channels,
-            ch_mults=self.channel_multipliers,
-            is_attn=self.is_attention,
-        ).to(self.device)
+            image_channels=cfg.image_channels,
+            n_channels=cfg.n_channels,
+            ch_mults=cfg.channel_multipliers,
+            is_attn=cfg.is_attention,
+        ).to(cfg.device)
 
         # Create [DDPM class](index.html)
         self.diffusion = DenoiseDiffusion(
             eps_model=self.eps_model,
-            n_steps=self.n_steps,
-            device=self.device,
+            n_steps=cfg.n_steps,
+            device=torch.device(cfg.device),
         )
 
-        # Create dataloader
-        self.data_loader = torch.utils.data.DataLoader(self.dataset, self.batch_size, shuffle=True, pin_memory=True)
-        # Create optimizer
-        self.optimizer = torch.optim.Adam(self.eps_model.parameters(), lr=self.learning_rate)
+        # dataset
+        if cfg.dataset == "celebA":
+            self.dataset = CelebADataset(cfg.root, cfg.image_size)
+        elif cfg.dataset != "celebA" and cfg.dataset == "MNIST":
+            self.dataset = MNISTDataset(cfg.root, cfg.image_size)
+        else:
+            print("데이터셋 이름 지정 오류")
+            raise ValueError
 
-        # Image logging
-        tracker.set_image("sample", True)
+
+        # Create dataloader
+        self.data_loader = torch.utils.data.DataLoader(self.dataset, cfg.batch_size, shuffle=True, pin_memory=True)
+        # Create optimizer
+        self.optimizer = torch.optim.Adam(self.eps_model.parameters(), lr=cfg.learning_rate)
 
     def sample(self):
         """
@@ -108,15 +112,15 @@ class Configs(BaseConfigs):
         """
         with torch.no_grad():
             # $x_T \sim p(x_T) = \mathcal{N}(x_T; \mathbf{0}, \mathbf{I})$
-            x = torch.randn([self.n_samples, self.image_channels, self.image_size, self.image_size],
-                            device=self.device)
+            x = torch.randn([self.cfg.n_samples, self.cfg.image_channels, self.cfg.image_size, self.cfg.image_size],
+                            device=self.cfg.device)
 
             # Remove noise for $T$ steps
             for t_ in monit.iterate('Sample', self.n_steps):
                 # $t$
-                t = self.n_steps - t_ - 1
+                t = self.cfg.n_steps - t_ - 1
                 # Sample from $\textcolor{lightgreen}{p_\theta}(x_{t-1}|x_t)$
-                x = self.diffusion.p_sample(x, x.new_full((self.n_samples,), t, dtype=torch.long))
+                x = self.diffusion.p_sample(x, x.new_full((self.cfg.n_samples,), t, dtype=torch.long))
 
             # Log samples
             tracker.save('sample', x)
@@ -131,7 +135,7 @@ class Configs(BaseConfigs):
             # Increment global step
             tracker.add_global_step()
             # Move data to device
-            data = data.to(self.device)
+            data = data.to(self.cfg.device)
 
             # Make the gradients zero
             self.optimizer.zero_grad()
@@ -148,7 +152,7 @@ class Configs(BaseConfigs):
         """
         ### Training loop
         """
-        for _ in monit.loop(self.epochs):
+        for _ in monit.loop(self.cfg.epochs):
             # Train the model
             self.train()
             # Sample some images
@@ -202,14 +206,6 @@ class CelebADataset(torch.utils.data.Dataset):
         return self._transform(img)
 
 
-@option(Configs.dataset, 'CelebA')
-def celeb_dataset(c: Configs):
-    """
-    Create CelebA dataset
-    """
-    return CelebADataset(c.image_size)
-
-
 class MNISTDataset(torchvision.datasets.MNIST):
     """
     ### MNIST dataset
@@ -232,37 +228,27 @@ class MNISTDataset(torchvision.datasets.MNIST):
         return super().__getitem__(item)[0]
 
 
-@option(Configs.dataset, 'MNIST')
-def mnist_dataset(c: Configs):
-    """
-    Create MNIST dataset
-    """
-    return MNISTDataset(c.image_size)
-
-
 def main():
     # Create experiment
     experiment.create(name='diffuse', writers={'screen', 'labml'})
 
-    # Create configurations
-    configs = Configs()
 
-    # Set configurations. You can override the defaults by passing the values in the dictionary.
-    experiment.configs(configs, {
-        'dataset': 'CelebA',  # 'MNIST'
-        'image_channels': 3,  # 1,
-        'epochs': 100,  # 5,
-    })
+    # TODO: 불러들일 yaml 파일 경로 수정 필요
+    with open("test.yaml", "r") as f:
+        loaded_dict = yaml.safe_load(f)
+        # Create configurations
+        configs = Configs(**loaded_dict)
+    # TODO: resume 일 경우 pth 안에 저장된 yaml 값으로 바꾸기
 
-    # Initialize
-    configs.init()
+    ddpm = DDPM(configs)
+
 
     # Set models for saving and loading
-    experiment.add_pytorch_models({'eps_model': configs.eps_model})
+    experiment.add_pytorch_models({'eps_model': ddpm.eps_model})
 
     # Start and run the training loop
     with experiment.start():
-        configs.run()
+        ddpm.run()
 
 
 #
