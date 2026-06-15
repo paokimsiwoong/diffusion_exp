@@ -34,6 +34,10 @@ from labml_nn.helpers.device import DeviceConfigs
 from dataclasses import dataclass, field, asdict
 import yaml
 
+from tqdm import tqdm
+import wandb
+import os
+
 @dataclass
 class Configs:
 
@@ -73,6 +77,11 @@ class Configs:
     # Number of training epochs
     epochs: int = 1_000
 
+    wandb: str = "online"
+    wandb_log_name: str = ""
+
+    sample_folder: str = "./samples"
+
 class DDPM:
     def __init__(self, cfg: Configs):
         self.cfg = cfg
@@ -106,7 +115,26 @@ class DDPM:
         # Create optimizer
         self.optimizer = torch.optim.Adam(self.eps_model.parameters(), lr=cfg.learning_rate)
 
-    def sample(self):
+        # wandb 초기화
+        self.wandb_run = wandb.init(
+        project="diffusion",
+        entity="pao-kim-si-woong",
+        config={
+            "lr": cfg.learning_rate,
+            "dataset": "CelebA or MNIST",
+            "n_epochs": cfg.epochs,
+            "loss": "MSE",
+            "notes": "ddpm 실험",
+        },
+        name=cfg.wandb_log_name,
+        mode=cfg.wandb, 
+        )
+        wandb.watch((self.eps_model,))
+
+        # 이번 로그 샘플 이미지 저장 폴더 생성
+        os.makedirs(f"{cfg.sample_folder}/{cfg.wandb_log_name}", exist_ok=True)
+
+    def sample(self, e:int):
         """
         ### Sample images
         """
@@ -116,24 +144,44 @@ class DDPM:
                             device=self.cfg.device)
 
             # Remove noise for $T$ steps
-            for t_ in monit.iterate('Sample', self.n_steps):
+            for t_ in tqdm(
+                range(self.cfg.n_steps),
+                total=self.cfg.n_steps
+            ):
                 # $t$
                 t = self.cfg.n_steps - t_ - 1
+                # T 부터 시작해 0까지 복원하므로 self.cfg.n_steps - t_
+                # 마지막 단계가 0이 되려면 -1 추가로 빼야함
+
                 # Sample from $\textcolor{lightgreen}{p_\theta}(x_{t-1}|x_t)$
                 x = self.diffusion.p_sample(x, x.new_full((self.cfg.n_samples,), t, dtype=torch.long))
+                # tensor.new_full(size, fill_value)는 tensor와 동일한 dtype, device
+                # 지정한 size와 fill_value로 새 텐서를 생성
+                # dtype과 device를 다르게 하고 싶을 때는 따로 지정 가능
 
             # Log samples
-            tracker.save('sample', x)
+            x_cpu = x.detach().cpu()
+            img_array = torchvision.utils.make_grid(x_cpu, nrow=8, normalize=True, value_range=(-1, 1))
+            if self.cfg.wandb != "disabled":
+                images = wandb.Image(img_array)
+                self.wandb_run.log({"samples": images})
+
+            torchvision.utils.save_image(img_array, f"{self.cfg.sample_folder}/{self.cfg.wandb_log_name}/epoch_{e}.png")
+
+
 
     def train(self):
         """
         ### Train
         """
 
+        num_batches_train = len(self.data_loader)
+
         # Iterate through the dataset
-        for data in monit.iterate('Train', self.data_loader):
-            # Increment global step
-            tracker.add_global_step()
+        for step, data in tqdm(
+            enumerate(self.data_loader),
+            total=num_batches_train,
+        ):
             # Move data to device
             data = data.to(self.cfg.device)
 
@@ -141,24 +189,36 @@ class DDPM:
             self.optimizer.zero_grad()
             # Calculate loss
             loss = self.diffusion.loss(data)
+
+            loss_value = loss.item()
+
             # Compute gradients
             loss.backward()
             # Take an optimization step
             self.optimizer.step()
+
             # Track the loss
-            tracker.save('loss', loss)
+            if self.cfg.wandb != "disabled":
+                wandb_step_dict = {
+                    "step_loss": loss_value,
+                }
+
+                self.wandb_run.log(wandb_step_dict)
 
     def run(self):
         """
         ### Training loop
         """
-        for _ in monit.loop(self.cfg.epochs):
+        for e in range(self.cfg.epochs):
+            
+            # TODO: 시작 시간
+
             # Train the model
             self.train()
             # Sample some images
-            self.sample()
-            # New line in the console
-            tracker.new_line()
+            self.sample(e)
+            
+            # TODO: 종료 시점 경과시간 및 결과 로그
 
 
 class CelebADataset(torch.utils.data.Dataset):
