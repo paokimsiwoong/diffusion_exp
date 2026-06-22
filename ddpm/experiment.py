@@ -17,7 +17,7 @@ Save the images inside [`data/celebA` folder](#dataset_path).
 The paper had used a exponential moving average of the model with a decay of $0.9999$. We have skipped this for
 simplicity.
 """
-from typing import List
+from typing import List, Literal
 from pathlib import Path
 
 import torchvision
@@ -25,11 +25,8 @@ from PIL import Image
 
 import torch
 import torch.utils.data
-from labml import lab, tracker, experiment, monit
-from labml.configs import BaseConfigs, option
 from __init__ import DenoiseDiffusion
 from unet import UNet
-from labml_nn.helpers.device import DeviceConfigs
 
 from dataclasses import dataclass, field, asdict
 import yaml
@@ -77,7 +74,7 @@ class Configs:
     # Number of training epochs
     epochs: int = 1_000
 
-    wandb: str = "online"
+    wandb: Literal['online', 'offline', 'disabled', 'shared'] = "online"
     wandb_log_name: str = ""
 
     sample_folder: str = "./samples"
@@ -211,10 +208,12 @@ class DDPM:
         """
         for e in range(self.cfg.epochs):
             
-            # TODO: 시작 시간
+            # TODO: 시작 시간 등 로깅
 
             # Train the model
             self.train()
+
+            # TODO: sample 횟수 조절하기(1에폭당 한번 대신 10~100에폭당 1번?)
             # Sample some images
             self.sample(e)
             
@@ -249,6 +248,14 @@ class CelebADataset(torch.utils.data.Dataset):
         # Transformations to resize the image and convert to tensor
         self._transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(image_size),
+            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            # CelebA 데이터셋은 178x218 사이즈로 정사각형이 아님
+            # CelebA를 정사각형 이미지를 기대하는 UNet에 넣기 위해서는
+            # CenterCrop이나 RandomCrop을 Resize 뒤에 넣어서 
+            # 직사각형 이미지안에서 정사각형 조각을 잘라내는 추가 조정이 필요
+            torchvision.transforms.CenterCrop(image_size),
+            # TODO: 정사각형으로 전처리 되어 있는 CelebA HQ 데이터셋으로 변경하기
+            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
             torchvision.transforms.ToTensor(),
         ])
 
@@ -289,12 +296,9 @@ class MNISTDataset(torchvision.datasets.MNIST):
 
 
 def main():
-    # Create experiment
-    experiment.create(name='diffuse', writers={'screen', 'labml'})
-
 
     # TODO: 불러들일 yaml 파일 경로 수정 필요
-    with open("test.yaml", "r") as f:
+    with open("/home/paokimsiwoong/workspace/github.com/paokimsiwoong/diffusion_exp/ddpm/test.yaml", "r") as f:
         loaded_dict = yaml.safe_load(f)
         # Create configurations
         configs = Configs(**loaded_dict)
@@ -302,13 +306,7 @@ def main():
 
     ddpm = DDPM(configs)
 
-
-    # Set models for saving and loading
-    experiment.add_pytorch_models({'eps_model': ddpm.eps_model})
-
-    # Start and run the training loop
-    with experiment.start():
-        ddpm.run()
+    ddpm.run()
 
 
 #
