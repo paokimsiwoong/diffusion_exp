@@ -23,6 +23,8 @@ from pathlib import Path
 import torchvision
 from PIL import Image
 
+import numpy as np
+
 import torch
 import torch.utils.data
 from __init__ import DenoiseDiffusion
@@ -34,6 +36,8 @@ import yaml
 from tqdm import tqdm
 import wandb
 import os
+
+from datetime import datetime
 
 @dataclass
 class Configs:
@@ -64,6 +68,8 @@ class Configs:
 
     # Number of time steps $T$
     n_steps: int = 1_000
+    # early stopping 기준 횟수
+    early_stop: int = 20
     # Batch size
     batch_size: int = 64
     # Number of samples to generate
@@ -74,10 +80,14 @@ class Configs:
     # Number of training epochs
     epochs: int = 1_000
 
+    pth_folder: str = "./pths"
+    sample_folder: str = "./samples"
+
     wandb: Literal['online', 'offline', 'disabled', 'shared'] = "online"
+    wandb_project_name: str = "diffusion"
+    wandb_entity: str = ""
     wandb_log_name: str = ""
 
-    sample_folder: str = "./samples"
 
 class DDPM:
     def __init__(self, cfg: Configs):
@@ -114,8 +124,8 @@ class DDPM:
 
         # wandb 초기화
         self.wandb_run = wandb.init(
-        project="diffusion",
-        entity="pao-kim-si-woong",
+        project=cfg.wandb_project_name,
+        entity=cfg.wandb_entity,
         config={
             "lr": cfg.learning_rate,
             "dataset": "CelebA or MNIST",
@@ -172,6 +182,8 @@ class DDPM:
         ### Train
         """
 
+        epoch_loss = 0
+
         num_batches_train = len(self.data_loader)
 
         # Iterate through the dataset
@@ -189,6 +201,8 @@ class DDPM:
 
             loss_value = loss.item()
 
+            epoch_loss += loss_value
+
             # Compute gradients
             loss.backward()
             # Take an optimization step
@@ -202,22 +216,105 @@ class DDPM:
 
                 self.wandb_run.log(wandb_step_dict)
 
+        # 배치당 loss 값의 평균 계산
+        epoch_mean_batch_loss = epoch_loss / num_batches_train
+
+        return epoch_mean_batch_loss
+
     def run(self):
         """
         ### Training loop
         """
+
+        # early stopping에 사용할 best loss 값
+        best_loss = np.inf
+        # TODO: resume일 경우 best_loss 저장된 값으로 변경
+        counter = 0
+        # TODO: resume일 경우 counter 저장된 값으로 변경
+
         for e in range(self.cfg.epochs):
             
-            # TODO: 시작 시간 등 로깅
+            print("".center(100, "-"))
+            print("".center(100, "-"))
+            print(f"Start train #{e+1:2d}")
+            epoch_start = datetime.now()
 
             # Train the model
-            self.train()
+            epoch_mean_batch_loss = self.train()
+
+                
+
+            train_end = datetime.now()
+            train_time = train_end - epoch_start
+            train_time = str(train_time).split(".")[0]
+            print("".center(100, "-"))
+            print("".center(100, "-"))
+            print(
+                f"==>> epoch {e+1} train_time: {train_time}"
+            )
+            print("".center(100, "-"))
+            print(
+                f"mean_batch_loss: {round(epoch_mean_batch_loss,6)}"
+            )
+            if best_loss > epoch_mean_batch_loss:
+                print("".center(100, "-"))
+                print(
+                    f"Best loss performance at epoch: {e+1}, {round(best_loss, 6)} -> {round(epoch_mean_batch_loss,6)}"
+                )
+                best_loss = epoch_mean_batch_loss
+                counter = 0
+            else:
+                counter += 1
+
+            # pth 파일 저장 경로
+            # ckpt_fpath = osp.join(self.cfg.pth_folder, f"ddpm_{self.cfg.wandb_log_name}_latest.pth")
+                # pathlib 사용하는 방식으로 변경
+            ckpt_dpath = Path(self.cfg.pth_folder)
+            ckpt_fpath = ckpt_dpath / f"ddpm_{self.cfg.wandb_log_name}_latest.pth"
+
+            # configs 클래스 dict 변환
+            cfg_dict = asdict(self.cfg)
+            cfg_dict["model_state_dict"] = self.eps_model.state_dict()
+            cfg_dict["optimizer_state_dict"] = self.optimizer.state_dict()
+            cfg_dict["current_epoch"] = e
+            cfg_dict["best_loss"] = best_loss
+            cfg_dict["early_stop_counter"] = counter
+            # TODO: pth에 yaml정보를 다 넣는대신 yaml을 매번 따로 생성하는 방식으로 변경?
+
+            torch.save(cfg_dict, ckpt_fpath)
+            # @@@ torch.save는 Path 오브젝트 지원
+
+            # counter가 0이면 best loss
+            if counter == 0:
+                # best_fpath = osp.join(self.cfg.pth_folder, f"ddpm_{self.cfg.wandb_log_name}_best.pth")
+                best_fpath = ckpt_dpath / f"ddpm_{self.cfg.wandb_log_name}_best.pth"
+                torch.save(cfg_dict, best_fpath)
+                # TODO: validation loss의 best가 아닌데 best 모델 저장할 필요가 있을지?
+
+            print("".center(100, "-"))
+            print("".center(100, "-"))
+            print(f"Start sampling #{e+1:2d}")
+            sp_start = datetime.now()
 
             # TODO: sample 횟수 조절하기(1에폭당 한번 대신 10~100에폭당 1번?)
             # Sample some images
             self.sample(e)
             
-            # TODO: 종료 시점 경과시간 및 결과 로그
+            epoch_end = datetime.now()
+            epoch_time = epoch_end - epoch_start
+            epoch_time = str(epoch_time).split(".")[0]
+            print("".center(100, "-"))
+            print("".center(100, "-"))
+            print(
+                f"==>> epoch {e+1} time: {epoch_time}"
+            )
+
+            # loss 수렴 확인될 경우 epoch 강제종료
+            if counter == self.cfg.early_stop:
+                print("".center(100, "-"))
+                print("".center(100, "-"))
+                print(f"Weight loss plateau reached at epoch{e-counter}.\nBest loss: {round(best_loss,4)}\nEalry stopping.")
+                break
 
 
 class CelebADataset(torch.utils.data.Dataset):
@@ -282,7 +379,7 @@ class MNISTDataset(torchvision.datasets.MNIST):
 
     def __init__(self, root:str, image_size):
         transform = torchvision.transforms.Compose([
-            torchvision.transforms.Resize(image_size),
+            torchvision.transforms.Resize((image_size, image_size)),
             torchvision.transforms.ToTensor(),
         ])
 
@@ -297,8 +394,30 @@ class MNISTDataset(torchvision.datasets.MNIST):
 
 def main():
 
-    # TODO: 불러들일 yaml 파일 경로 수정 필요
-    with open("/home/paokimsiwoong/workspace/github.com/paokimsiwoong/diffusion_exp/ddpm/test.yaml", "r") as f:
+    yaml_root = input("실험 설정 yaml 파일 경로를 입력하세요. : ")
+
+    print(yaml_root)
+
+    yaml_path = Path(yaml_root)
+
+    if not yaml_path.exists():
+        print("잘못된 경로 입니다.")
+        print("실험 종료")
+        return
+    elif not yaml_path.is_file():
+        print("파일이 아닙니다.")
+        print("실험 종료")
+        return
+
+    print("".center(100, "-"))
+
+    time_start = datetime.now()
+
+    train_start = time_start.strftime("%Y%m%d_%H%M%S")
+
+    # TODO: seed 고정 코드
+
+    with open(yaml_path, "r") as f:
         loaded_dict = yaml.safe_load(f)
         # Create configurations
         configs = Configs(**loaded_dict)
@@ -306,8 +425,27 @@ def main():
 
     ddpm = DDPM(configs)
 
+    init_end = datetime.now()
+    init_time = init_end - time_start
+    init_time = str(init_time).split(".")[0]
+    print(f"==>> initialization_time: {init_time}")
+
+    print("".center(100, "-"))
+
     ddpm.run()
 
+    print("".center(100, "-"))
+    print("".center(100, "-"))
+    print("".center(100, "-"))
+
+    time_end = datetime.now()
+    total_time = time_end - time_start
+    total_time = str(total_time).split(".")[0]
+    print(f"==>> total time: {total_time}")
+
+    print("".center(100, "-"))
+    print("".center(100, "-"))
+    print("".center(100, "-"))
 
 #
 if __name__ == '__main__':
