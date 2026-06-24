@@ -86,7 +86,7 @@ class Configs:
     wandb: Literal['online', 'offline', 'disabled', 'shared'] = "online"
     wandb_project_name: str = "diffusion"
     wandb_entity: str = ""
-    wandb_log_name: str = ""
+    wandb_log_name: str = "test"
 
 
 class DDPM:
@@ -253,7 +253,12 @@ class DDPM:
             # Train the model
             epoch_mean_batch_loss = self.train()
 
-                
+            if self.cfg.wandb != "disabled":
+                wandb_epoch_dict = {
+                    "epoch_loss": epoch_mean_batch_loss,
+                }
+
+                self.wandb_run.log(wandb_epoch_dict)
 
             train_end = datetime.now()
             train_time = train_end - epoch_start
@@ -406,7 +411,6 @@ class MNISTDataset(torchvision.datasets.MNIST):
 def main():
 
     yaml_root = input("실험 설정 yaml 파일 경로를 입력하세요. : ")
-    # TODO: wandb log name 사용자 입력 변경으로 바꾸기
 
     print(yaml_root)
 
@@ -423,17 +427,26 @@ def main():
 
     print("".center(100, "-"))
 
-    time_start = datetime.now()
-
-    train_start = time_start.strftime("%Y%m%d_%H%M%S")
-
-    # TODO: seed 고정 코드
-
     with open(yaml_path, "r") as f:
         loaded_dict = yaml.safe_load(f)
         # Create configurations
         configs = Configs(**loaded_dict)
     # TODO: resume 일 경우 pth 안에 저장된 yaml 값으로 바꾸기
+
+    # wandb log name 사용자 입력값으로 변경
+    log_name = input("이번 실험 이름을 입력하세요. : ")
+    print(log_name)
+
+    if log_name:
+        configs.wandb_log_name = log_name
+    else:
+        print("실험 이름 미입력. 기본 설정값을 사용합니다.")
+
+    time_start = datetime.now()
+
+    train_start = time_start.strftime("%Y%m%d_%H%M%S")
+
+    # TODO: seed 고정 코드
 
     ddpm = DDPM(configs)
 
