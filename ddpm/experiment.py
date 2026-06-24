@@ -139,7 +139,18 @@ class DDPM:
         wandb.watch((self.eps_model,))
 
         # 이번 로그 샘플 이미지 저장 폴더 생성
-        os.makedirs(f"{cfg.sample_folder}/{cfg.wandb_log_name}", exist_ok=True)
+        # os.makedirs(f"{cfg.sample_folder}/{cfg.wandb_log_name}", exist_ok=True)
+        # (Path(cfg.sample_folder) / cfg.wandb_log_name).mkdir(parents=True, exist_ok=True)
+        sf_path = Path(cfg.sample_folder) / cfg.wandb_log_name
+        sf_path.mkdir(parents=True, exist_ok=True)
+        # 샘플 이미지 폴더에 해당 실험 yaml도 같이 저장
+        yaml_str = yaml.dump(asdict(cfg), default_flow_style=False)
+        (sf_path / "exp.yaml").write_text(yaml_str, encoding="utf-8")
+        # @@@ with + Path 객체의 .open 사용 방식도 가능
+        # with (sf_path / "exp.yaml").open("w", encoding="utf-8") as f:
+        #     yaml.dump(asdict(cfg), f, default_flow_style=False)
+
+
 
     def sample(self, e:int):
         """
@@ -313,7 +324,7 @@ class DDPM:
             if counter == self.cfg.early_stop:
                 print("".center(100, "-"))
                 print("".center(100, "-"))
-                print(f"Weight loss plateau reached at epoch{e-counter}.\nBest loss: {round(best_loss,4)}\nEalry stopping.")
+                print(f"Weight loss plateau reached at epoch {e-counter+1}.\nBest loss: {round(best_loss,4)}\nEalry stopping.")
                 break
 
 
@@ -395,6 +406,7 @@ class MNISTDataset(torchvision.datasets.MNIST):
 def main():
 
     yaml_root = input("실험 설정 yaml 파일 경로를 입력하세요. : ")
+    # TODO: wandb log name 사용자 입력 변경으로 바꾸기
 
     print(yaml_root)
 
