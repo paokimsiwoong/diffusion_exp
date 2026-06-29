@@ -74,3 +74,6 @@
 ---
 ---
 
+[*Three Equivalent Interpretations*](ch8.md#three-equivalent-interpretations)
+---
+---

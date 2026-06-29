@@ -7,7 +7,7 @@
 >>### 5. [HVAE](Understanding_Diffusion_Models_A_Unified_Perspective/ch4~5.md#hvae)
 >>### 6. [VDM](Understanding_Diffusion_Models_A_Unified_Perspective/ch6_part1.md#vdm)
 >>### 7. [Learning Diffusion Noise Parameters](Understanding_Diffusion_Models_A_Unified_Perspective/ch7.md#learning-diffusion-noise-parameters)
->>### 8. [Three Equivalent Interpretations](Understanding_Diffusion_Models_A_Unified_Perspective/ch8~10.md#three-equivalent-interpretations)
->>### 9. [Score-based Generative Models](Understanding_Diffusion_Models_A_Unified_Perspective/ch8~10.md#score-based-generative-models)
->>### 10. [Guidance](Understanding_Diffusion_Models_A_Unified_Perspective/ch8~10.md#guidance)
+>>### 8. [Three Equivalent Interpretations](Understanding_Diffusion_Models_A_Unified_Perspective/ch8.md#three-equivalent-interpretations)
+>>### 9. [Score-based Generative Models](Understanding_Diffusion_Models_A_Unified_Perspective/ch9~10.md#score-based-generative-models)
+>>### 10. [Guidance](Understanding_Diffusion_Models_A_Unified_Perspective/ch9~10.md#guidance)
 
