@@ -214,7 +214,7 @@ Eq. 70에서 얻은 true posterior $`q(x_t|x_0) = \mathcal{N}(x_{t} ; \sqrt{\bar
 
 ## **노이즈 $`\boldsymbol{\epsilon}_0`$ 와 점수 함수 $`\nabla\log p(x_t)`$의 관계**
 
-이 노이즈 기준 해석과 score 함수 기준 해석의 결과들을 비교하면 상수 배 정도의 차이만 있고 거의 식이 유사한 것을 확인할 수 있다. 노이즈 기준 해석에서 얻은 $`x_0`$ (Eq. 115)과 score 함수 기준 해석 전개과정에서 얻어진 $x_0$ (Eq. 133)들을 = 로 두고 풀어보면
+이 노이즈 기준 해석과 score 함수 기준 해석의 결과들을 비교하면 상수 배 정도의 차이만 있고 거의 식이 유사한 것을 확인할 수 있다. 노이즈 기준 해석에서 얻은 $`x_0`$ (Eq. 115)과 score 함수 기준 해석 전개과정에서 얻어진 $`x_0`$ (Eq. 133)들을 = 로 두고 풀어보면
 
 **Equation 149~151:**
 
@@ -227,9 +227,9 @@ x_0 = \frac{x_t + (1 - \bar{\alpha}_t)\nabla\log p(x_t)}{\sqrt{\bar{\alpha}_t}} 
 ```
 <br>
 
-이 되어 time-step t만 따라서 변하는 상수배 차이만 있고 완전히 동일한 형태인 것을 확인 가능하다.  
+이 되어 time-step $`t`$만 따라서 변하는 상수배 차이만 있고 완전히 동일한 형태인 것을 확인 가능하다.  
   
-이는 score function은 log probability를 최대화 하는 방향(gradient of log p(x))인데, source noise는 추가되면서 원본 이미지를 손상시키므로 이 source noise의 반대 방향으로 이동하는 것은 원본 이미지로 복원되는 방향으로 생각할 수 있다. 여기서 이미지가 복원되는 방향과 log probability가 증가하는 방향 모두 true data(true mean)을 구하는 동일한 방향으로 생각할 수 있다. 결국 score 함수를 모델링하는 것은 source noise의 역방향을 모델링하는 것과 동일하다는 것을 직관과 수식으로 확인할 수 있다. 
+이는 score function은 log probability를 최대화 하는 방향(gradient of $`log\ p(x)`$)인데, source noise는 추가되면서 원본 이미지를 손상시키므로 이 source noise의 반대 방향으로 이동하는 것은 원본 이미지로 복원되는 방향으로 생각할 수 있다. 여기서 이미지가 복원되는 방향과 log probability가 증가하는 방향 모두 true data(true mean)을 구하는 동일한 방향으로 생각할 수 있다. 결국 score 함수를 모델링하는 것은 source noise의 역방향을 모델링하는 것과 동일하다는 것을 직관과 수식으로 확인할 수 있다. 
 
 ---
 ---
