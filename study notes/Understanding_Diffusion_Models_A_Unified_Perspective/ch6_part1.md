@@ -16,11 +16,11 @@
 2. The structure of the latent encoder at each timestep is not learned; it is pre-defined as a **linear** Gaussian
 model. In other words, it is a Gaussian distribution centered around the output of the previous timestep
     - linear 조건이 반드시 있어야 한다. 
-        - t-step의 $`x_t`$를 구하려 할 때, 비선형일 경우 $`0, 1, 2, ..., t`$ 까지 순차적으로 복잡한 비선형 가우시안 분포 $`q(x_i | x_{i-1})`$를 계산해 다음 단계의 $`x`$를 계산해야 한다.  
+        - $`t`$-step의 $`x_t`$를 구하려 할 때, 비선형일 경우 $`0,\ 1,\ 2,\ \dots,\ t`$ 까지 순차적으로 복잡한 비선형 가우시안 분포 $`q(x_i | x_{i-1})`$를 계산해 다음 단계의 $`x`$를 계산해야 한다.  
         그러나 linearity를 가정하면 수많은 step 뒤의 $`x_t`$를 구하려 할 때도, 서로 독립인 가우시안 분포들의 선형 결합은 다시 가우시안 분포가 되기 때문에,  
-        순차적으로 계산할 필요 없이 t-step의 $`x_t`$를 closed-form 계산으로 바로 구할 수 있다.  (자세한 수식은 뒤에) 
+        순차적으로 계산할 필요 없이 $`t`$-step의 $`x_t`$를 closed-form 계산으로 바로 구할 수 있다.  (자세한 수식은 뒤에) 
 3. The Gaussian parameters of the latent encoders vary over time in such a way that the distribution of
-the latent at final timestep T is a standard Gaussian
+the latent at final timestep $`T`$ is a standard Gaussian
 
 제한조건 1에서 관측데이터 $`x`$와 latent $`z_{1:T}`$들의 차원 수가 같으므로 time step $`t \in [0,T]`$에 대해, 관측데이터는 $`t=0`$일 때 $`x_0`$으로 두고, latent variables들은 $`x_t,\ \text{where}\ t \in [1,T]`$로 둘 수 있게 된다. 이 조건으로 인해 HVAE의 posterior Eq. 24가 VDM에서는 
 

@@ -51,7 +51,7 @@ x_{t-1} = \sqrt{\alpha_{t-1}}x_{t-2} + \sqrt{1 - \alpha_{t-1}}\boldsymbol{\epsil
 <br>
 
 이 된다.  
-$`2T`$개의 독립적인 랜덤 노이즈 변수 $`\{\boldsymbol{\epsilon}^*_t, \boldsymbol{\epsilon}_t\}^T_{t=0} \overset{iid}{\sim} \mathcal{N}(\boldsymbol{\epsilon}; \boldsymbol{0},\textbf{I})`$ 가 있고, 그 랜덤 노이즈 변수들에서 샘플링이 가능하다고 가정한 상태에서, 아래와 같이 reparameterization trick으로 표현한 $`t-1, t-2, ...., 1`$ 단계의 $`x_i`$들을 계속 대입하면 $`x_t \sim q(x_t | x_0)`$을 하나의 가우시안 분포로 표현 가능하다.
+$`2T`$개의 독립적인 랜덤 노이즈 변수 $`\{\boldsymbol{\epsilon}^*_t, \boldsymbol{\epsilon}_t\}^T_{t=0} \overset{iid}{\sim} \mathcal{N}(\boldsymbol{\epsilon}; \boldsymbol{0},\textbf{I})`$ 가 있고, 그 랜덤 노이즈 변수들에서 샘플링이 가능하다고 가정한 상태에서, 아래와 같이 reparameterization trick으로 표현한 $`t-1,\ t-2,\ ....,\ 1`$ 단계의 $`x_i`$들을 계속 대입하면 $`x_t \sim q(x_t | x_0)`$을 하나의 가우시안 분포로 표현 가능하다.
 
 **Equation 61~70:**
 
@@ -370,7 +370,7 @@ $`p_{\boldsymbol{\theta}}(x_{t-1}|x_t)`$과 $`q(x_{t-1}|x_t, x_0)`$ 사이의 KL
 그래서 학습 시에는 2부터 T사이에서 무작위로 하나의 time-step t를 뽑고 그 t에 대한 $`\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2`$만 계산해서 모델 가중치를 업데이트한다.  
 이 과정을 수만 장의 이미지 데이터에 대해 수만 번 반복하면, 통계적으로 대수의 법칙에 의해 $`\sum_{t=2}^T`$ 전체를 계산해서 가중치를 업데이트 한 것과 동일한 결과를 얻을 수 있다.
 
-> (Eq. 99)로 인해 T개의 $`p_{\boldsymbol{\theta}}(x_{0}|x_1), p_{\boldsymbol{\theta}}(x_{1}|x_2), \dots , p_{\boldsymbol{\theta}}(x_{t-1}|x_t), \dots , p_{\boldsymbol{\theta}}(x_{T-1}|x_T)`$ 분포를 배울 필요 없이 원본 이미지 $`x_0`$를 예측하는 신경망 모델 $`\hat{x}_{\boldsymbol{\theta}}(x_t, t)`$ 하나만 학습한다.  
+> (Eq. 99)로 인해 T개의 $`p_{\boldsymbol{\theta}}(x_{0}|x_1),\ p_{\boldsymbol{\theta}}(x_{1}|x_2),\ \dots,\ p_{\boldsymbol{\theta}}(x_{t-1}|x_t),\ \dots,\ p_{\boldsymbol{\theta}}(x_{T-1}|x_T)`$ 분포를 배울 필요 없이 원본 이미지 $`x_0`$를 예측하는 신경망 모델 $`\hat{x}_{\boldsymbol{\theta}}(x_t, t)`$ 하나만 학습한다.  
 학습 시에 무작위로 time-step $`t`$가 정해지면 (Eq. 69 $`x_t= \sqrt{\bar\alpha_t}x_0 + \sqrt{1 - \bar\alpha_t}\boldsymbol{\epsilon}_0`$)로 원본 이미지에서 $`t`$ step 이미지 $`x_t`$를 바로 생성 가능하다.  
 모델은 이 $`t`$ 단계 이미지와 time-step $`t`$를 입력받아 원본 이미지를 복원하고, 이 복원한 이미지와 원본 이미지 사이의 $`L^2`$ norm 값을 loss로 두고 역전파를 통한 가중치 갱신을 진행한다.
 >> ($`t`$는 모델에 입력될 때, timestep embedding을 거쳐서 $`t`$ 단계별 차이를 키워 모델의 학습을 돕는다)
