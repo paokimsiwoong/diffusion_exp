@@ -27,13 +27,29 @@ x_0 = \frac{x_t - \sqrt{1 - \bar{\alpha}_t}\boldsymbol{\epsilon}_0}{\sqrt{\bar{\
 
 ```math
 \begin{aligned}
-\boldsymbol{\mu}_q(x_t, x_0) &= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t} + \sqrt{\bar{\alpha}_{t-1}}(1-\alpha_t)x_0}{1 -\bar{\alpha}_{t}}\\
+\boldsymbol{\mu}_q(x_t, x_0) &= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t} + \sqrt{\bar{\alpha}_{t-1}}(1-\alpha_t)x_0}{1 -\bar{\alpha}_{t}}
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t} + \sqrt{\bar{\alpha}_{t-1}}(1-\alpha_t)\frac{x_t - \sqrt{1 - \bar{\alpha}_t}\boldsymbol{\epsilon}_0}{\sqrt{\bar{\alpha}_t}}}{1 -\bar{\alpha}_{t}}\\
-&= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t} + (1-\alpha_t)\frac{x_t - \sqrt{1 - \bar{\alpha}_t}\boldsymbol{\epsilon}_0}{\sqrt{\alpha_t}}}{1 -\bar{\alpha}_{t}}  \qquad \bigg(\because \frac{\sqrt{\bar{\alpha}_{t-1}}}{\sqrt{\bar{\alpha}_t}} = \frac{1}{\sqrt{\alpha_t}} \bigg)\\
+&= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t} + (1-\alpha_t)\frac{x_t - \sqrt{1 - \bar{\alpha}_t}\boldsymbol{\epsilon}_0}{\sqrt{\alpha_t}}}{1 -\bar{\alpha}_{t}}  \qquad \bigg(\because \frac{\sqrt{\bar{\alpha}_{t-1}}}{\sqrt{\bar{\alpha}_t}} = \frac{1}{\sqrt{\alpha_t}} \bigg)
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t}}{1 - \bar{\alpha}_t} + \frac{(1-\alpha_t)x_t}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}} - \frac{(1 - \alpha_t)\sqrt{1 - \bar{\alpha}_t}\boldsymbol{\epsilon}_0}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}}\\
-&= \left(\frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} + \frac{1-\alpha_t}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}}\right)x_t - \frac{(1 - \alpha_t)\sqrt{1 - \bar{\alpha}_t}}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}}\boldsymbol{\epsilon}_0\\
+&= \left(\frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} + \frac{1-\alpha_t}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}}\right)x_t - \frac{(1 - \alpha_t)\sqrt{1 - \bar{\alpha}_t}}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}}\boldsymbol{\epsilon}_0
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \left(\frac{\alpha_t(1-\bar{\alpha}_{t-1})}{(1 - \bar{\alpha}_t)\sqrt{\alpha_t}} + \frac{1-\alpha_t}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}}\right)x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}\sqrt{\alpha_t}}\boldsymbol{\epsilon}_0\\
-&= \frac{\alpha_t-\bar{\alpha}_{t} + 1-\alpha_t}{(1 - \bar{\alpha}_t)\sqrt{\alpha_t}}x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}\sqrt{\alpha_t}}\boldsymbol{\epsilon}_0 \qquad \bigg(\because \prod_{i=1}^t\alpha_i \stackrel{\text{def}}{=} \bar\alpha_t \bigg)\\
+&= \frac{\alpha_t-\bar{\alpha}_{t} + 1-\alpha_t}{(1 - \bar{\alpha}_t)\sqrt{\alpha_t}}x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}\sqrt{\alpha_t}}\boldsymbol{\epsilon}_0 \qquad \bigg(\because \prod_{i=1}^t\alpha_i \stackrel{\text{def}}{=} \bar\alpha_t \bigg)
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \frac{1-\bar{\alpha}_t}{(1 - \bar{\alpha}_t)\sqrt{\alpha_t}}x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}\sqrt{\alpha_t}}\boldsymbol{\epsilon}_0\\
 &= \frac{1}{\sqrt{\alpha_t}}x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}\sqrt{\alpha_t}}\boldsymbol{\epsilon}_0
 \end{aligned}
@@ -132,13 +148,29 @@ Eq. 70에서 얻은 true posterior $`q(x_t|x_0) = \mathcal{N}(x_{t} ; \sqrt{\bar
 
 ```math
 \begin{aligned}
-\boldsymbol{\mu}_q(x_t, x_0) &= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t} + \sqrt{\bar{\alpha}_{t-1}}(1-\alpha_t)x_0}{1 -\bar{\alpha}_{t}}\\
+\boldsymbol{\mu}_q(x_t, x_0) &= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t} + \sqrt{\bar{\alpha}_{t-1}}(1-\alpha_t)x_0}{1 -\bar{\alpha}_{t}}
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t} + \sqrt{\bar{\alpha}_{t-1}}(1-\alpha_t)\frac{x_t + (1 - \bar{\alpha}_t)\nabla\log p(x_t)}{\sqrt{\bar{\alpha}_t}}}{1 -\bar{\alpha}_{t}}\\
-&= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t} + (1-\alpha_t)\frac{x_t + (1 - \bar{\alpha}_t)\nabla\log p(x_t)}{\sqrt{\alpha_t}}}{1 -\bar{\alpha}_{t}}\\
+&= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t} + (1-\alpha_t)\frac{x_t + (1 - \bar{\alpha}_t)\nabla\log p(x_t)}{\sqrt{\alpha_t}}}{1 -\bar{\alpha}_{t}}
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})x_{t}}{1 - \bar{\alpha}_t} + \frac{(1-\alpha_t)x_t}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}} + \frac{(1 - \alpha_t)(1 - \bar{\alpha}_t)\nabla\log p(x_t)}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}}\\
-&= \left(\frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} + \frac{1-\alpha_t}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}}\right)x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}}\nabla\log p(x_t)\\
+&= \left(\frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} + \frac{1-\alpha_t}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}}\right)x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}}\nabla\log p(x_t)
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \left(\frac{\alpha_t(1-\bar{\alpha}_{t-1})}{(1 - \bar{\alpha}_t)\sqrt{\alpha_t}} + \frac{1-\alpha_t}{(1-\bar{\alpha}_t)\sqrt{\alpha_t}}\right)x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}}\nabla\log p(x_t)\\
-&= \frac{\alpha_t-\bar{\alpha}_{t} + 1-\alpha_t}{(1 - \bar{\alpha}_t)\sqrt{\alpha_t}}x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}}\nabla\log p(x_t)\\
+&= \frac{\alpha_t-\bar{\alpha}_{t} + 1-\alpha_t}{(1 - \bar{\alpha}_t)\sqrt{\alpha_t}}x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}}\nabla\log p(x_t)
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \frac{1-\bar{\alpha}_t}{(1 - \bar{\alpha}_t)\sqrt{\alpha_t}}x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}}\nabla\log p(x_t)\\
 &= \frac{1}{\sqrt{\alpha_t}}x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}}\nabla\log p(x_t)
 \end{aligned}
