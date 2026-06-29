@@ -128,21 +128,21 @@ q(x_t | x_{t-1}) = q(x_t | x_{t-1}, x_0) = \frac{q(x_{t-1}|x_t, x_0)q(x_t|x_0)}{
 ```math
 \mathbb{E}_{q(x_{1}|x_0)}\left[\log p_{\boldsymbol{\theta}}(x_0|x_1)\right]
 ```
-
+<br>
 VAE ELBO의 reconstruction term과 동일한 구조로, 이 항 역시 몬테 카를로 추정을 이용해 근사 및 학습이 가능하다.
 
 **Prior matching term**  
 ```math
 D_{\text{KL}}(q(x_T|x_0) \| p(x_T))
 ```
-
+<br>
 VDM ELBO 유도 1의 prior matching term과 동일하게 학습하지 않는 항이며 제한조건 3을 만족하는 VDM에서는 사실상 0이다.
 
 **Denoising matching term**  
 ```math
 \mathbb{E}_{q(x_{t}|x_0)}\left[D_{\text{KL}}(q(x_{t-1}|x_t, x_0) \| p_{\boldsymbol{\theta}}(x_{t-1}|x_t))\right]
 ```
-
+<br>
 VDM 모델 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$을 tractable(뒤에서 설명), ground-truth $q(x_{t-1}|x_t, x_0)$에 근사하도록 학습하는 항. ($q(x_{t-1}|x_t, x_0)$는 $x_{t-1}$을 $x_t$에 더해 최종 정답인 원본 이미지 $x_0$를 같이 참고해서 복원하는 분포이므로 ground-truth signal로 취급 가능)
 
 이 VDM ELBO 2 해석을 그림으로 표현하면 아래와 같다.

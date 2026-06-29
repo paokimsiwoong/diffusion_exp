@@ -183,21 +183,21 @@ p(x_T) &= \mathcal{N}(x_T; \mathbf{0}, \mathbf{I})
 ```math
 \mathbb{E}_{q(x_{1}|x_0)}\left[\log p_{\boldsymbol{\theta}}(x_0|x_1)\right]
 ```
-
+<br>
 VAE의 reconstruction term과 동일한 구조에 $x$와 $z$ 대신 원본 데이터 $x_0$와 first-step latent $x_1$로 교체된 형태 => 동일한 방식으로 학습
 
 **Prior matching term**  
 ```math
 \mathbb{E}_{q(x_{T-1}|x_0)}\left[D_{\text{KL}}(q(x_T|x_{T-1}) \| p(x_T))\right]
 ```
-
+<br>
 이 항은 마지막 단계 T의 latent distribution $q(x_{T-1}, x_{T})$이 Gaussian prior에 근사할 때 최소화되는데, 학습 가능 파라메터가 없으므로 학습하지 않는 항이다. 학습은 하지 않지만 VDM 제한조건 3( = $p(x_T)$ 가 표준정규분포)을 만족하도록 충분히 T를 크게해서 forward process를 설계하므로 이 항은 사실상 0이다.
 
 **consistency term**  
 ```math
 \mathbb{E}_{q(x_{t-1}, x_{t+1}|x_0)}\left[D_{\text{KL}}(q(x_{t}|x_{t-1}) \| p_{\theta}(x_{t}|x_{t+1}))\right]
 ```
-
+<br>
 이 항은 t step의 분포 ($x_t$의 분포)가 forward 방향에서 구하건, backward 방향에서 구하건 일관적으로 일치하게 하도록 강제하는 항이다. 이 항의 KL div.는 VDM 모델이 $x_{t+1}$에서 노이즈를 제거해 만든 $x_t$가 $x_{t-1}$에서 노이즈를 추가해 만든 $x_t$과 얼마나 비슷한지를 측정한다. 따라서 $p_{\theta}(x_{t}|x_{t+1})$를 사전에 설정한 linear Gaussian(Eq. 31)인 $q(x_{t}|x_{t-1})$를 근사하도록 학습해야 항이 최소화된다.
 
 이 VDM ELBO 1 해석을 그림으로 표현하면 아래와 같다.

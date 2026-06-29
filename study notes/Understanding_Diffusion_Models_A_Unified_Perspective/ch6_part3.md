@@ -52,11 +52,7 @@ x_{t-1} = \sqrt{\alpha_{t-1}}x_{t-2} + \sqrt{1 - \alpha_{t-1}}\boldsymbol{\epsil
 <br>
 
 이 된다.  
-2T개의 독립적인 랜덤 노이즈 변수  
-```math
-\{\boldsymbol{\epsilon}^*_t, \boldsymbol{\epsilon}_t\}^T_{t=0} \overset{iid}{\sim} \mathcal{N}(\boldsymbol{\epsilon}; \boldsymbol{0},\textbf{I})
-```
-가 있고, 그 랜덤 노이즈 변수들에서 샘플링이 가능하다고 가정한 상태에서, 아래와 같이 reparameterization trick으로 표현한 t-1, t-2, ...., 1 단계의 $x_i$들을 계속 대입하면 $x_t \sim q(x_t | x_0)$을 하나의 가우시안 분포로 표현 가능하다.
+2T개의 독립적인 랜덤 노이즈 변수 $`\{\boldsymbol{\epsilon}^*_t, \boldsymbol{\epsilon}_t\}^T_{t=0} \overset{iid}{\sim} \mathcal{N}(\boldsymbol{\epsilon}; \boldsymbol{0},\textbf{I})`$ 가 있고, 그 랜덤 노이즈 변수들에서 샘플링이 가능하다고 가정한 상태에서, 아래와 같이 reparameterization trick으로 표현한 t-1, t-2, ...., 1 단계의 $x_i$들을 계속 대입하면 $x_t \sim q(x_t | x_0)$을 하나의 가우시안 분포로 표현 가능하다.
 
 **Equation 61~70:**
 
@@ -77,9 +73,7 @@ x_t  &= \sqrt{\alpha_t}x_{t-1} + \sqrt{1 - \alpha_t}\boldsymbol{\epsilon}_{t-1}^
 <br>
 
 > **(Eq. 63 -> Eq. 66)**
->> ```math
->> \sqrt{\alpha_t - \alpha_t\alpha_{t-1}}\boldsymbol{\epsilon}_{t-2}^* + \sqrt{1 - \alpha_t}\boldsymbol{\epsilon}_{t-1}^*
->> ```
+>> $`\sqrt{\alpha_t - \alpha_t\alpha_{t-1}}\boldsymbol{\epsilon}_{t-2}^* + \sqrt{1 - \alpha_t}\boldsymbol{\epsilon}_{t-1}^*`$
 >> 은 서로 독립인 Gaussian의 합이므로 합 결과도 또 Gaussian이 된다.  
 >> 이 때, 합 분포의 평균과 분산은 두 Gaussian 분포의 평균, 분산의 합이 된다.   
 >> $`\sqrt{\alpha_t - \alpha_t\alpha_{t-1}}\boldsymbol{\epsilon}_{t-2}^*`$의 평균은 $`0`$, 분산은 $`(\sqrt{\alpha_t - \alpha_t\alpha_{t-1}})^2`$,  
@@ -138,9 +132,9 @@ q(x_{t-1}|x_t, x_0)
 
 이 결과를 보면, $q(x_{t-1}|x_t, x_0)$은 평균이 $\boldsymbol{\mu}_q(x_t, x_0)$이고 분산이 $\boldsymbol{\Sigma}_q(t)$인 Gaussian 분포이므로 tractable함을 알 수 있다.
 
-> 사실 식에 나오는 모든 가우시안 분포들은 다변수 가우시안 분포이므로 지수항은 $-\frac{1}{2}(\mathbf{x}-\bm{\mu})^T\Sigma^{-1}(\mathbf{x}-\bm{\mu})$로 $-\frac{1}{2} \times \text{Mahalanobis distance}(\mathbf{x},\bm{\mu})$이다.  
-> 또 모든 분포가 등방성(isotropic, 공분산이 $\mathbf{I}$의 상수배) 이므로 $\Sigma = \sigma^2\mathbf{I} \rightarrow \Sigma^{-1} = \frac{1}{\sigma^2}\mathbf{I}$이 되어  
-> 지수항은 $-\frac{1}{2\sigma^2}\|\mathbf{x}-\bm{\mu}\|^2$ 이 된다.  
+> 사실 식에 나오는 모든 가우시안 분포들은 다변수 가우시안 분포이므로 지수항은 $`-\frac{1}{2}(\mathbf{x}-\boldsymbol{\mu})^T\Sigma^{-1}(\mathbf{x}-\boldsymbol{\mu})`$로 $`-\frac{1}{2} \times \text{Mahalanobis distance}(\mathbf{x},\boldsymbol{\mu})`$이다.  
+> 또 모든 분포가 등방성(isotropic, 공분산이 $`\mathbf{I}`$의 상수배) 이므로 $`\Sigma = \sigma^2\mathbf{I} \rightarrow \Sigma^{-1} = \frac{1}{\sigma^2}\mathbf{I}`$이 되어  
+> 지수항은 $`-\frac{1}{2\sigma^2}\|\mathbf{x}-\boldsymbol{\mu}\|^2`$ 이 된다.  
 > 이를 반영해 다시 계산해보면
 > ```math
 > \begin{aligned}
@@ -263,7 +257,7 @@ q(x_{t-1}|x_t, x_0)
 denoising matching term을 통해 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$를 $q(x_{t-1}|x_t, x_0)$에 근사하는 것이 학습 목표인 상황.  
 $q(x_{t-1}|x_t, x_0)$이 항상 계산 가능한 Gaussian이므로 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$도 Gaussian으로 모델링하는게 좋다.  
 또 $q(x_{t-1}|x_t, x_0)$의 분산은 t만을 변수로 가지는 함수이므로 각 t step마다 바로 계산 가능하면서 고정된 값이다. 따라서 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$의 분산도 $`\boldsymbol{\Sigma}_q(t) = \sigma_q^2(t)\mathbf{I}`$로 동일하게 설정한다.  
-분산은 ground-truth와 동일하게 두지만, 평균 $`\bm{\mu}_{\theta}(x_t, t)$는 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)`$이 ground-truth 함수와 다르게 $x_0$를 조건으로 가지지 않으므로 $x_t$에 대한 함수로 설정한다.
+분산은 ground-truth와 동일하게 두지만, 평균 $`\boldsymbol{\mu}_{\theta}(x_t, t)$는 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)`$이 ground-truth 함수와 다르게 $x_0$를 조건으로 가지지 않으므로 $x_t$에 대한 함수로 설정한다.
 
 두 다변수 가우시안 분포 사이의 KL divergence는
 
