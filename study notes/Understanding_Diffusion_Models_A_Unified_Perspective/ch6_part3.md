@@ -7,7 +7,10 @@
 ---
 ---
 
-### [**$q(x_{t-1}|x_t, x_0)$ == tractable**](ch6_part2.md#-tractable---part-3에서-계속)
+[part 2로 돌아가기](ch6_part2.md#-tractable---part-3에서-계속)
+
+### **$q(x_{t-1}|x_t, x_0)$ == tractable**
+---
 
 ELBO 유도 2의 3가지 항에서 학습을 진행할 때 가장 많은 비용이 들고 영향을 주는 부분은 summation이 있는 3번째 항. Markovian HVAE의 경우에는 forward process의 T개의 encoder $q_{\phi}$들을 decoder $p_{\theta}$와 같이 동시에 학습하며 $D_{\text{KL}}(q(x_{t-1}|x_t, x_0) \| p_{\boldsymbol{\theta}}(x_{t-1}|x_t))$을 최소화해야 하기 때문에 매우 어렵다. 반면에 VDM의 경우 제한조건에 의해서 encoder $q_{\phi}$들을 학습하지 않고, 미리 정해두므로 $q(x_{t-1}|x_t, x_0)$가 tractable이 된다.
 
@@ -51,7 +54,7 @@ x_{t-1} = \sqrt{\alpha_{t-1}}x_{t-2} + \sqrt{1 - \alpha_{t-1}}\boldsymbol{\epsil
 이 된다.  
 2T개의 독립적인 랜덤 노이즈 변수  
 ```math
-\{\bm{\epsilon}^*_t, \bm{\epsilon}_t\}^T_{t=0} \overset{iid}{\sim} \mathcal{N}(\bm{\epsilon}; \bm{0},\textbf{I})
+\{\boldsymbol{\epsilon}^*_t, \boldsymbol{\epsilon}_t\}^T_{t=0} \overset{iid}{\sim} \mathcal{N}(\boldsymbol{\epsilon}; \boldsymbol{0},\textbf{I})
 ```
 가 있고, 그 랜덤 노이즈 변수들에서 샘플링이 가능하다고 가정한 상태에서, 아래와 같이 reparameterization trick으로 표현한 t-1, t-2, ...., 1 단계의 $x_i$들을 계속 대입하면 $x_t \sim q(x_t | x_0)$을 하나의 가우시안 분포로 표현 가능하다.
 
@@ -79,10 +82,10 @@ x_t  &= \sqrt{\alpha_t}x_{t-1} + \sqrt{1 - \alpha_t}\boldsymbol{\epsilon}_{t-1}^
 >> ```
 >> 은 서로 독립인 Gaussian의 합이므로 합 결과도 또 Gaussian이 된다.  
 >> 이 때, 합 분포의 평균과 분산은 두 Gaussian 분포의 평균, 분산의 합이 된다.   
->> $\sqrt{\alpha_t - \alpha_t\alpha_{t-1}}\boldsymbol{\epsilon}_{t-2}^*$의 평균은 $0$, 분산은 $(\sqrt{\alpha_t - \alpha_t\alpha_{t-1}})^2$,  
->> $\sqrt{1 - \alpha_t}\boldsymbol{\epsilon}_{t-1}^*$의 평균은 $0$, 분산은 $(\sqrt{1 - \alpha_t})^2$ 이므로  
->> 합분포의 평균은 $0 + 0 = 0$, 분산은 $(\sqrt{\alpha_t - \alpha_t\alpha_{t-1}})^2 + (\sqrt{1 - \alpha_t})^2 = \alpha_t - \alpha_t\alpha_{t-1} + 1 - \alpha_t = 1 - \alpha_t\alpha_{t-1}$가 된다.  
->> 이를 reparameterization trick을 이용해 노이즈 $\bm{\epsilon}$ 형태로 표현하면 Eq. 66의 $\sqrt{1 - \alpha_t\alpha_{t-1}}\boldsymbol{\epsilon}_{t-2}$을 얻을 수 있다.
+>> $`\sqrt{\alpha_t - \alpha_t\alpha_{t-1}}\boldsymbol{\epsilon}_{t-2}^*`$의 평균은 $`0`$, 분산은 $`(\sqrt{\alpha_t - \alpha_t\alpha_{t-1}})^2`$,  
+>> $`\sqrt{1 - \alpha_t}\boldsymbol{\epsilon}_{t-1}^*`$의 평균은 $`0`$, 분산은 $`(\sqrt{1 - \alpha_t})^2`$ 이므로  
+>> 합분포의 평균은 $`0 + 0 = 0`$, 분산은 $`(\sqrt{\alpha_t - \alpha_t\alpha_{t-1}})^2 + (\sqrt{1 - \alpha_t})^2 = \alpha_t - \alpha_t\alpha_{t-1} + 1 - \alpha_t = 1 - \alpha_t\alpha_{t-1}`$가 된다.  
+>> 이를 reparameterization trick을 이용해 노이즈 $`\boldsymbol{\epsilon}`$ 형태로 표현하면 Eq. 66의 $`\sqrt{1 - \alpha_t\alpha_{t-1}}\boldsymbol{\epsilon}_{t-2}`$을 얻을 수 있다.
 
 이제 $q(x_{t-1}|x_t, x_0) = \frac{q(x_t | x_{t-1}, x_0)q(x_{t-1}|x_0)}{q(x_{t}|x_0)}$의 우변이 모두 tractable이므로 이들을 대입하면
 
@@ -240,7 +243,7 @@ q(x_{t-1}|x_t, x_0)
 >> 노이즈가 등방성인 가우시안 분포이라는 것은 노이즈가 추가될 때, n차원 벡터 $\mathbf{x}_t$의 각 차원 element(=pixel)에 추가되는 픽셀 노이즈들은 서로 독립으로 correlation이 없어서 공분산 행렬의 대각 성분이 전부 0이라는 것이다.  
 >> 따라서 특정 채널의 특정 픽셀에 노이즈를 더 심하게 주지 않고 완벽하게 독립적이고 동일한 강도인 노이즈를 주입한다.
 
-> 추가로 분산 $\boldsymbol{\Sigma}_q(t) = \frac{(1 - \alpha_t)(1 - \bar\alpha_{t-1})}{1 -\bar\alpha_{t}}\mathbf{I}$에서  
+> 추가로 분산 $`\boldsymbol{\Sigma}_q(t) = \frac{(1 - \alpha_t)(1 - \bar\alpha_{t-1})}{1 -\bar\alpha_{t}}\mathbf{I}`$에서  
 >   
 > **Equation 85:**
 > ```math
@@ -259,8 +262,8 @@ q(x_{t-1}|x_t, x_0)
 
 denoising matching term을 통해 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$를 $q(x_{t-1}|x_t, x_0)$에 근사하는 것이 학습 목표인 상황.  
 $q(x_{t-1}|x_t, x_0)$이 항상 계산 가능한 Gaussian이므로 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$도 Gaussian으로 모델링하는게 좋다.  
-또 $q(x_{t-1}|x_t, x_0)$의 분산은 t만을 변수로 가지는 함수이므로 각 t step마다 바로 계산 가능하면서 고정된 값이다. 따라서 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$의 분산도 $\boldsymbol{\Sigma}_q(t) = \sigma_q^2(t)\mathbf{I}$로 동일하게 설정한다.  
-분산은 ground-truth와 동일하게 두지만, 평균 $\bm{\mu}_{\theta}(x_t, t)$는 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$이 ground-truth 함수와 다르게 $x_0$를 조건으로 가지지 않으므로 $x_t$에 대한 함수로 설정한다.
+또 $q(x_{t-1}|x_t, x_0)$의 분산은 t만을 변수로 가지는 함수이므로 각 t step마다 바로 계산 가능하면서 고정된 값이다. 따라서 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$의 분산도 $`\boldsymbol{\Sigma}_q(t) = \sigma_q^2(t)\mathbf{I}`$로 동일하게 설정한다.  
+분산은 ground-truth와 동일하게 두지만, 평균 $`\bm{\mu}_{\theta}(x_t, t)$는 $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)`$이 ground-truth 함수와 다르게 $x_0$를 조건으로 가지지 않으므로 $x_t$에 대한 함수로 설정한다.
 
 두 다변수 가우시안 분포 사이의 KL divergence는
 
@@ -295,12 +298,12 @@ D_{\text{KL}}(\mathcal{N}(\mathbf{x}; \boldsymbol{\mu}_x,\boldsymbol{\Sigma}_x) 
 ```
 <br>
 
-> $\bm{\mu}_{q} = \bm{\mu}_{q}(x_t, x_0)$  
-> $\bm{\mu}_{\theta} = \bm{\mu}_{\theta}(x_t, t)$
+> $`\boldsymbol{\mu}_{q} = \boldsymbol{\mu}_{q}(x_t, x_0)`$  
+> $`\boldsymbol{\mu}_{\theta} = \boldsymbol{\mu}_{\theta}(x_t, t)`$
 
 이 된다. 
 
-$\bm{\mu}_{q}$는 아래와 같다. (Eq. 84)
+$`\boldsymbol{\mu}_{q}`$는 아래와 같다. (Eq. 84)
 
 **Equation 93:**
 
@@ -311,7 +314,7 @@ $\bm{\mu}_{q}$는 아래와 같다. (Eq. 84)
 ```
 <br>
 
-$p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$과 $q(x_{t-1}|x_t, x_0)$ 사이의 KL divergence를 최소화 하는 것은 Eq. 92에서 보이듯 $\bm{\mu}_{q}$와 $\bm{\mu}_{\theta}$사이의 L2 norm을 최소화 하는 것과 동일하므로 $\bm{\mu}_{\theta}$를 $\bm{\mu}_{q}$와 최대한 동일한 형태를 가지도록 모델링 하면,
+$p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$과 $q(x_{t-1}|x_t, x_0)$ 사이의 KL divergence를 최소화 하는 것은 Eq. 92에서 보이듯 $`\boldsymbol{\mu}_{q}`$와 $`\boldsymbol{\mu}_{\theta}`$사이의 L2 norm을 최소화 하는 것과 동일하므로 $`\boldsymbol{\mu}_{\theta}`$를 $`\boldsymbol{\mu}_{q}`$와 최대한 동일한 형태를 가지도록 모델링 하면,
 
 **Equation 94:**
 
@@ -324,7 +327,7 @@ $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$과 $q(x_{t-1}|x_t, x_0)$ 사이의 KL div
 
 이 된다.
 
-이렇게 모델링한 $\bm{\mu}_{q}$와 $\bm{\mu}_{\theta}$를 Eq. 92의 L2 norm에 대입하면
+이렇게 모델링한 $`\boldsymbol{\mu}_{q}`$와 $`\boldsymbol{\mu}_{\theta}`$를 Eq. 92의 L2 norm에 대입하면
 
 **Equation 95~99:**
 
@@ -342,8 +345,8 @@ $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$과 $q(x_{t-1}|x_t, x_0)$ 사이의 KL div
 
 노이즈가 끼어 있는 이미지 $x_t$와 time-step $t$값을 가지고 $\hat{x}_{\boldsymbol{\theta}}(x_t, t)$를 원본 $x_0$에 최대한 유사하도록 예측 하는 것으로 바뀌게 된다.
 
-다시 denoising matching term $\sum_{t=2}^T\mathbb{E}_{q(x_{t}|x_0)}\left[D_{\text{KL}}(q(x_{t-1}|x_t, x_0) \| p_{\boldsymbol{\theta}}(x_{t-1}|x_t))\right] = \sum_{t=2}^T\mathbb{E}_{q(x_{t}|x_0)}\left[\frac{1}{2\sigma_q^2(t)}\frac{\bar\alpha_{t-1}(1-\alpha_t)^2}{(1 -\bar\alpha_{t})^2}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]\right]$을 보면  
-일반적으로 T=1000으로 둘 때, 이미지 $x_0$한장에 대해 t=2 부터 T까지 999번 모델 신경망이 예측한 $\hat{x}_{\boldsymbol{\theta}}(x_t, t)$과의 L2 norm을 구해서 summation을 진행해야 한다.  
+다시 denoising matching term $`\sum_{t=2}^T\mathbb{E}_{q(x_{t}|x_0)}\left[D_{\text{KL}}(q(x_{t-1}|x_t, x_0) \| p_{\boldsymbol{\theta}}(x_{t-1}|x_t))\right] = \sum_{t=2}^T\mathbb{E}_{q(x_{t}|x_0)}\left[\frac{1}{2\sigma_q^2(t)}\frac{\bar\alpha_{t-1}(1-\alpha_t)^2}{(1 -\bar\alpha_{t})^2}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]\right]`$을 보면  
+일반적으로 T=1000으로 둘 때, 이미지 $`x_0`$한장에 대해 t=2 부터 T까지 999번 모델 신경망이 예측한 $`\hat{x}_{\boldsymbol{\theta}}(x_t, t)`$과의 L2 norm을 구해서 summation을 진행해야 한다.  
 따라서 summation을 그대로 두면 사실상 학습이 불가능할 정도로 엄청난 양의 연산량이 필요해진다.
 
 이를 해결하기 위해서 아래와 같이 식을 변경하면
@@ -371,8 +374,8 @@ $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$과 $q(x_{t-1}|x_t, x_0)$ 사이의 KL div
 <br>
 
 이렇게 기댓값의 형태로 바꾸고 나면 몬테카를로 샘플링을 사용할 수 있게 된다(L=1).  
-그래서 학습 시에는 2부터 T사이에서 무작위로 하나의 time-step t를 뽑고 그 t에 대한 $\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2$만 계산해서 모델 가중치를 업데이트한다.  
-이 과정을 수만 장의 이미지 데이터에 대해 수만 번 반복하면, 통계적으로 대수의 법칙에 의해 $\sum_{t=2}^T$ 전체를 계산해서 가중치를 업데이트 한 것과 동일한 결과를 얻을 수 있다.
+그래서 학습 시에는 2부터 T사이에서 무작위로 하나의 time-step t를 뽑고 그 t에 대한 $`\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2`$만 계산해서 모델 가중치를 업데이트한다.  
+이 과정을 수만 장의 이미지 데이터에 대해 수만 번 반복하면, 통계적으로 대수의 법칙에 의해 $`\sum_{t=2}^T`$ 전체를 계산해서 가중치를 업데이트 한 것과 동일한 결과를 얻을 수 있다.
 
 > (Eq. 99)로 인해 T개의 $p_{\boldsymbol{\theta}}(x_{0}|x_1), p_{\boldsymbol{\theta}}(x_{1}|x_2), \dots , p_{\boldsymbol{\theta}}(x_{t-1}|x_t), \dots , p_{\boldsymbol{\theta}}(x_{T-1}|x_T)$ 분포를 배울 필요 없이 원본 이미지 $x_0$를 예측하는 신경망 모델 $\hat{x}_{\boldsymbol{\theta}}(x_t, t)$ 하나만 학습한다.  
 학습 시에 무작위로 time-step t가 정해지면 (Eq. 69 $x_t= \sqrt{\bar\alpha_t}x_0 + \sqrt{1 - \bar\alpha_t}\boldsymbol{\epsilon}_0$)로 원본 이미지에서 t step 이미지 $x_t$를 바로 생성 가능하다.  
@@ -381,4 +384,9 @@ $p_{\boldsymbol{\theta}}(x_{t-1}|x_t)$과 $q(x_{t-1}|x_t, x_0)$ 사이의 KL div
 
 ---
 ---
+
+[*Learning Diffusion Noise Parameters*](ch7.md#learning-diffusion-noise-parameters)
+---
+---
+
 

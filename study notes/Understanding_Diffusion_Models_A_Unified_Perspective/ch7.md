@@ -15,13 +15,25 @@
 ```math
 \begin{aligned}
 \frac{1}{2\sigma_q^2(t)}\frac{\bar{\alpha}_{t-1}(1-\alpha_t)^2}{(1 -\bar{\alpha}_{t})^2}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]
-&= \frac{1}{2\frac{(1 - \alpha_t)(1 - \bar{\alpha}_{t-1})}{1 -\bar{\alpha}_{t}}}\frac{\bar{\alpha}_{t-1}(1-\alpha_t)^2}{(1 -\bar{\alpha}_{t})^2}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]\\
+&= \frac{1}{2\frac{(1 - \alpha_t)(1 - \bar{\alpha}_{t-1})}{1 -\bar{\alpha}_{t}}}\frac{\bar{\alpha}_{t-1}(1-\alpha_t)^2}{(1 -\bar{\alpha}_{t})^2}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \frac{1}{2}\frac{1 -\bar{\alpha}_{t}}{(1 - \alpha_t)(1 - \bar{\alpha}_{t-1})}\frac{\bar{\alpha}_{t-1}(1-\alpha_t)^2}{(1 -\bar{\alpha}_{t})^2}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]\\
-&= \frac{1}{2}\frac{\bar{\alpha}_{t-1}(1-\alpha_t)}{(1 - \bar{\alpha}_{t-1})(1 -\bar{\alpha}_{t})}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]\\
+&= \frac{1}{2}\frac{\bar{\alpha}_{t-1}(1-\alpha_t)}{(1 - \bar{\alpha}_{t-1})(1 -\bar{\alpha}_{t})}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \frac{1}{2}\frac{\bar{\alpha}_{t-1}-\bar{\alpha}_t}{(1 - \bar{\alpha}_{t-1})(1 -\bar{\alpha}_{t})}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]\\
-&= \frac{1}{2}\frac{\bar{\alpha}_{t-1} - \bar{\alpha}_{t-1}\bar{\alpha}_t + \bar{\alpha}_{t-1}\bar{\alpha}_t-\bar{\alpha}_t}{(1 - \bar{\alpha}_{t-1})(1 -\bar{\alpha}_{t})}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]\\
+&= \frac{1}{2}\frac{\bar{\alpha}_{t-1} - \bar{\alpha}_{t-1}\bar{\alpha}_t + \bar{\alpha}_{t-1}\bar{\alpha}_t-\bar{\alpha}_t}{(1 - \bar{\alpha}_{t-1})(1 -\bar{\alpha}_{t})}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]
+\end{aligned}
+```
+```math
+\begin{aligned}
 &= \frac{1}{2}\frac{\bar{\alpha}_{t-1}(1 - \bar{\alpha}_t) -\bar{\alpha}_t(1 - \bar{\alpha}_{t-1})}{(1 - \bar{\alpha}_{t-1})(1 -\bar{\alpha}_{t})}\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]\\
-&= \frac{1}{2}\left(\frac{\bar{\alpha}_{t-1}(1 - \bar{\alpha}_t)}{(1 - \bar{\alpha}_{t-1})(1 -\bar{\alpha}_{t})} -\frac{\bar{\alpha}_t(1 - \bar{\alpha}_{t-1})}{(1 - \bar{\alpha}_{t-1})(1 -\bar{\alpha}_{t})}\right)\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]\\
+&= \frac{1}{2}\left(\frac{\bar{\alpha}_{t-1}(1 - \bar{\alpha}_t)}{(1 - \bar{\alpha}_{t-1})(1 -\bar{\alpha}_{t})} -\frac{\bar{\alpha}_t(1 - \bar{\alpha}_{t-1})}{(1 - \bar{\alpha}_{t-1})(1 -\bar{\alpha}_{t})}\right)\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right] \\
 &= \frac{1}{2}\left(\frac{\bar{\alpha}_{t-1}}{1 - \bar{\alpha}_{t-1}} -\frac{\bar{\alpha}_t}{1 -\bar{\alpha}_{t}}\right)\left[\left\lVert\hat{x}_{\boldsymbol{\theta}}(x_t, t) - x_0\right\rVert_2^2\right]
 \end{aligned}
 ```
@@ -61,3 +73,4 @@
 
 ---
 ---
+
