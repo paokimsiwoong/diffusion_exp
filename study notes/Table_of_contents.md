@@ -1,5 +1,5 @@
-# *Table of contents*
->## 1. Understanding Diffusion Models: A Unified Perspective
+# [*Table of contents*](../README.md#table-of-contents)
+>## 2. [Understanding Diffusion Models: A Unified Perspective](Understanding_Diffusion_Models_A_Unified_Perspective)
 >>### 1. [Generative Models](Understanding_Diffusion_Models_A_Unified_Perspective/ch1~3.md#generative-models)
 >>### 2. [Background](Understanding_Diffusion_Models_A_Unified_Perspective/ch1~3.md#background)
 >>### 3. [ELBO](Understanding_Diffusion_Models_A_Unified_Perspective/ch1~3.md#elbo)

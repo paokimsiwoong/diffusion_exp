@@ -1,9 +1,9 @@
-# [**Understanding Diffusion Models: A Unified Perspective**](../Table_of_contents.md#table-of-contents)
+# [**Understanding Diffusion Models: A Unified Perspective**](../../README.md#table-of-contents)
 ---
 ---
 ---
 
-# [*VDM*](../Table_of_contents.md#table-of-contents)
+# [*VDM*](../../README.md#table-of-contents)
 ---
 ---
 

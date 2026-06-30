@@ -329,7 +329,7 @@ class DDPM:
             if counter == self.cfg.early_stop:
                 print("".center(100, "-"))
                 print("".center(100, "-"))
-                print(f"Weight loss plateau reached at epoch {e-counter+1}.\nBest loss: {round(best_loss,4)}\nEalry stopping.")
+                print(f"MSE loss plateau reached at epoch {e-counter+1}.\nBest loss: {round(best_loss,4)}\nEalry stopping.")
                 break
 
 
