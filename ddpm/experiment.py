@@ -1,21 +1,5 @@
 """
----
-title: Denoising Diffusion Probabilistic Models (DDPM) training
-summary: >
-  Training code for
-  Denoising Diffusion Probabilistic Model.
----
-
-# [Denoising Diffusion Probabilistic Models (DDPM)](index.html) training
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/labmlai/annotated_deep_learning_paper_implementations/blob/master/labml_nn/diffusion/ddpm/experiment.ipynb)
-
-This trains a DDPM based model on CelebA HQ dataset. You can find the download instruction in this
-[discussion on fast.ai](https://forums.fast.ai/t/download-celeba-hq-dataset/45873/3).
-Save the images inside [`data/celebA` folder](#dataset_path).
-
-The paper had used a exponential moving average of the model with a decay of $0.9999$. We have skipped this for
-simplicity.
+출처: https://nn.labml.ai/diffusion/ddpm/experiment.html
 """
 from typing import List, Literal
 from pathlib import Path
@@ -35,7 +19,6 @@ import yaml
 
 from tqdm import tqdm
 import wandb
-import os
 
 from datetime import datetime
 
@@ -80,8 +63,9 @@ class Configs:
     # Number of training epochs
     epochs: int = 1_000
 
-    pth_folder: str = "./pths"
-    sample_folder: str = "./samples"
+    # pth_folder: str = "./pths"
+    # sample_folder: str = "./samples"
+    exp_folder: str = "./exps"
 
     wandb: Literal['online', 'offline', 'disabled', 'shared'] = "online"
     wandb_project_name: str = "diffusion"
@@ -141,11 +125,11 @@ class DDPM:
         # 이번 로그 샘플 이미지 저장 폴더 생성
         # os.makedirs(f"{cfg.sample_folder}/{cfg.wandb_log_name}", exist_ok=True)
         # (Path(cfg.sample_folder) / cfg.wandb_log_name).mkdir(parents=True, exist_ok=True)
-        sf_path = Path(cfg.sample_folder) / cfg.wandb_log_name
-        sf_path.mkdir(parents=True, exist_ok=True)
+        self.exp_path = Path(cfg.exp_folder) / cfg.wandb_log_name
+        self.exp_path.mkdir(parents=True, exist_ok=True)
         # 샘플 이미지 폴더에 해당 실험 yaml도 같이 저장
         yaml_str = yaml.dump(asdict(cfg), default_flow_style=False)
-        (sf_path / "exp.yaml").write_text(yaml_str, encoding="utf-8")
+        (self.exp_path / "exp.yaml").write_text(yaml_str, encoding="utf-8")
         # @@@ with + Path 객체의 .open 사용 방식도 가능
         # with (sf_path / "exp.yaml").open("w", encoding="utf-8") as f:
         #     yaml.dump(asdict(cfg), f, default_flow_style=False)
@@ -164,7 +148,8 @@ class DDPM:
             # Remove noise for $T$ steps
             for t_ in tqdm(
                 range(self.cfg.n_steps),
-                total=self.cfg.n_steps
+                total=self.cfg.n_steps,
+                desc='Sample' # 진행 바 이름 표시
             ):
                 # $t$
                 t = self.cfg.n_steps - t_ - 1
@@ -184,7 +169,7 @@ class DDPM:
                 images = wandb.Image(img_array)
                 self.wandb_run.log({"samples": images})
 
-            torchvision.utils.save_image(img_array, f"{self.cfg.sample_folder}/{self.cfg.wandb_log_name}/epoch_{e}.png")
+            torchvision.utils.save_image(img_array, self.exp_path / f"epoch_{e}.png")
 
 
 
@@ -201,6 +186,9 @@ class DDPM:
         for step, data in tqdm(
             enumerate(self.data_loader),
             total=num_batches_train,
+            desc='Train' # 진행 바 이름 표시
+            # TODO: 동적으로 desc 값 변경하는 것 해보기
+                # ex: Epoch n | loss: 0.xxxx: xx%
         ):
             # Move data to device
             data = data.to(self.cfg.device)
@@ -285,8 +273,7 @@ class DDPM:
             # pth 파일 저장 경로
             # ckpt_fpath = osp.join(self.cfg.pth_folder, f"ddpm_{self.cfg.wandb_log_name}_latest.pth")
                 # pathlib 사용하는 방식으로 변경
-            ckpt_dpath = Path(self.cfg.pth_folder)
-            ckpt_fpath = ckpt_dpath / f"ddpm_{self.cfg.wandb_log_name}_latest.pth"
+            ckpt_fpath = self.exp_path / f"ddpm_{self.cfg.wandb_log_name}_latest.pth"
 
             # configs 클래스 dict 변환
             cfg_dict = asdict(self.cfg)
@@ -303,7 +290,7 @@ class DDPM:
             # counter가 0이면 best loss
             if counter == 0:
                 # best_fpath = osp.join(self.cfg.pth_folder, f"ddpm_{self.cfg.wandb_log_name}_best.pth")
-                best_fpath = ckpt_dpath / f"ddpm_{self.cfg.wandb_log_name}_best.pth"
+                best_fpath = self.exp_path / f"ddpm_{self.cfg.wandb_log_name}_best.pth"
                 torch.save(cfg_dict, best_fpath)
                 # TODO: validation loss의 best가 아닌데 best 모델 저장할 필요가 있을지?
 

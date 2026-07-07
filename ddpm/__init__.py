@@ -30,14 +30,16 @@ class DenoiseDiffusion:
         # Create $\beta_1, \dots, \beta_T$ linearly increasing variance schedule
         self.beta = torch.linspace(0.0001, 0.02, n_steps).to(device)
         # DDPM 원논문과 동일하게 β_1은 10^-4, β_T 는 0.02로 설정
+        # n_steps 1000일 때, torch.Size([1000])
 
         # $\alpha_t = 1 - \beta_t$
         self.alpha = 1. - self.beta
 
         # $\bar\alpha_t = \prod_{s=1}^t \alpha_s$
         self.alpha_bar = torch.cumprod(self.alpha, dim=0)
-        # torch.cumprod는 (x_0, x_1, x_2, ..., x_i, ...)인 벡터를 받으면
-        # (x_0, x_0*x_1, x_0*x_1*x_2, ..., x_0*x_1*....*x_i, ...)를 반환
+        # (α_0, α_0*α_1, α_0*α_1*α_2, ..., α_0*α_1*....*α_i, ...)
+            # torch.cumprod는 (x_0, x_1, x_2, ..., x_i, ...)인 벡터를 받으면
+            # (x_0, x_0*x_1, x_0*x_1*x_2, ..., x_0*x_1*....*x_i, ...)를 반환
 
         # $T$
         self.n_steps = n_steps
@@ -57,7 +59,7 @@ class DenoiseDiffusion:
         \end{align}
         """
 
-        # [gather](utils.html) $\alpha_t$ and compute $\sqrt{\bar\alpha_t} x_0$
+        # utils의 gather 함수 사용 $\alpha_t$ and compute $\sqrt{\bar\alpha_t} x_0$
         mean = gather(self.alpha_bar, t) ** 0.5 * x0
         # $(1-\bar\alpha_t) \mathbf{I}$
         var = 1 - gather(self.alpha_bar, t)

@@ -1,12 +1,3 @@
-"""
----
-title: Utility functions for DDPM experiment
-summary: >
-  Utility functions for DDPM experiment
----
-
-# Utility functions for [DDPM](index.html) experiemnt
-"""
 import torch.utils.data
 
 from pathlib import Path
@@ -14,8 +5,13 @@ from pathlib import Path
 # logging 라이브러리 사용해보기
 import logging
 
+# 출처: https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/labml_nn/diffusion/ddpm/utils.py
 def gather(consts: torch.Tensor, t: torch.Tensor):
-    """Gather consts for $t$ and reshape to feature map shape"""
+    """
+    Gather consts for $t$ and reshape to feature map shape
+      상수 텐서들은 0~T-1 각 step의 상수 값 전부를 담고 있다
+      그 중 원하는 t-step의 값만 gather로 추출
+    """
     c = consts.gather(-1, t)
     return c.reshape(-1, 1, 1, 1)
 
