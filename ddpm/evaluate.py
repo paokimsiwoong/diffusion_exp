@@ -432,6 +432,10 @@ def main():
     time_start = datetime.now()
     eval_start = time_start.strftime("%Y%m%d_%H%M%S")
 
+    # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    configs.wandb = 'disabled'
+    # TODO: 학습과정에 추가된 run에 evaluate에서 생성한 video 파일만 추가 가능한지 찾아보기
+    # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     ddpm = DDPM(configs)
 
     load_dict = torch.load(pth_path, map_location="cpu")
