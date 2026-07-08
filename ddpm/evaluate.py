@@ -108,7 +108,9 @@ class Sampler:
             # clamp(min, max)는 min보다 작은 값은 min로, max보다 큰 값은 max로 바꿔서
             # [min, max] 범위로 텐서 값을 제한한다.  
         img = img.cpu().numpy()
+
         plt.imshow(img.transpose(1, 2, 0))
+        # [c, h, w] 를 [h, w, c]로 transpose 한 후 plt에 입력
         plt.title(title)
         plt.show()
 
@@ -137,7 +139,7 @@ class Sampler:
         show the estimate
         $$x_0 \approx \hat{x}_0 = \frac{1}{\sqrt{\bar\alpha}}
          \Big( x_t - \sqrt{1 - \bar\alpha_t} \textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big)$$
-            # 여기서 x_0의 근사식은 q(x_t | x_0)로 구해진 x_t = \sqrt{\bar\alpha_t} x_0 +  \sqrt{1 - \bar\alpha_t}\epsilon_0를 
+            # 여기서 x_0의 근사식(\hat{x}_0)은 q(x_t | x_0)로 구해진 x_t = \sqrt{\bar\alpha_t} x_0 +  \sqrt{1 - \bar\alpha_t}\epsilon_0를 
             # x_0에 대해서 정리한뒤 ground truth noise \epsilon_0를 UNet이 예측한 노이즈 \epsilon_\theta로 변경한 것
 
         """
@@ -150,6 +152,11 @@ class Sampler:
         interval = self.n_steps // n_frames
         # Frames for video
         frames = []
+
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        # x_t도 어떻게 변화해가는지 확인해보기
+        frames_xt = []
+        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
         # Sample $T$ steps
         for t_inv in tqdm(
@@ -169,12 +176,35 @@ class Sampler:
             # $\textcolor{lightgreen}{\epsilon_\theta}(x_t, t)$
             eps_theta = self.eps_model(xt, t)
             # t-step의 노이즈 예측
+            # xt는 [b=1, c=3, h, w]
+            # t는 [b=1]
 
             if t_ % interval == 0:
                 # Get $\hat{x}_0$ and add to frames
                 x0 = self.p_x0(xt, t, eps_theta)
 
+                # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                # 여기서 x_t 대신 t step에서 구한 x_0의 근사값 \hat{x}_0를 시각화 하는 이유
+                    # x_t는 t 값이 클 때 (완전 가우시안 노이즈인 T와 가까울 때) 거의 가우시안 노이즈와 유사해
+                    # x_t로 복원 과정을 시각화하면 상당 부분이 거의 노이즈만 낀 프레임들을 보게 되어 시각화의 의미가 거의 없다.
+                        # 실제로 생성된 20초 영상을 확인해보면 
+                        # 거의 15초가 되어서 흐릿하게 얼굴 윤곽선이 보이기 전까진 무의미해보이는 노이즈만 낀 프레임만 보이고
+                        # 마지막 몇초 사이에 급격하게 복원이 진행되는 것처럼 보인다.
+                    # 그대신 각 t step마다 x_0의 근사값을 계산해서 보면
+                        # \hat{x}_0는 현재 step에서 가진 정보로 예측하는 원본 이미지이므로
+                        # 각 단계에서 예측하는 이미지가 얼마나 원본 이미지에 가까운지를 확인하면
+                        # 현재 복원이 잘 진행되고 있는지 시각적으로 확인 가능하다.
+                            # 실제로 생성된 x_0 시각화 영상을 보면
+                            # 2~3초 시점부터 사람 얼굴로 인식 가능한 프레임이 보이기 시작한다.
+                            # @@@ 거의 최후반 전까지는 예측 결과가 최종 결과와는 다른 사람들로 계속 바뀌다가 
+                            # @@@ 마지막 1~2초에 한사람으로 결정되는 것처럼 보인다.
+                    # 초기 단계에는 큰 부분 부분별 색상이나 큰 윤곽선이 보이는 저주파 특징이 보이고
+                    # 후반에는 머리카락, 텍스쳐, 세세한 경계선 등의 디테일이 보이는 고주파 특징을 확인 가능하다.
+                frames_xt.append(xt[0]) # @@@ x_t도 리스트에 저장해 x_t의 변화과정 확인
+                # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                 frames.append(x0[0])
+                # x0[0]을 하면 [b=1, c=3, h, w]가 [c=3, h, w]로 바뀌어 squeeze(0)로 배치차원을 제거하는 효과
+
                 if not create_video:
                     self.show_image(x0[0], f"{t_}")
 
@@ -185,6 +215,10 @@ class Sampler:
         # Make video
         if create_video:
             self.make_video(frames, self.eval_path / "video.mp4")
+            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            self.make_video(frames_xt, self.eval_path / "video_xt.mp4")
+            # x_t 비디오 파일 생성
+            # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
     def interpolate(self, x1: torch.Tensor, x2: torch.Tensor, lambda_: float, t_: int = 100):
         """
@@ -307,6 +341,10 @@ class Sampler:
         \begin{align}
         \textcolor{lightgreen}{p_\theta}(x_{t-1} | x_t) &= \mathcal{N}\big(x_{t-1};
         \textcolor{lightgreen}{\mu_\theta}(x_t, t), \sigma_t^2 \mathbf{I} \big) \\
+            # DDPM 논문에서 p_θ(x_{t-1}|x_t)의 분산은 ground truth q(x_{t-1} | x_t, x_0)의 복잡한 분산을 그대로 쓰지 않고
+            # q(x_t | x_{t-1})의 간단한 분산을 사용해도 결과에 차이가 없다는 것을 보였으므로 
+            # q(x_t | x_{t-1})의 분산 \sigma_t^2(self.sigma2)을 사용 
+            # (자세한 설명은 __init__.py의 DenoiseDiffusion 클래스 p_sample 메소드 주석 확인)
         \textcolor{lightgreen}{\mu_\theta}(x_t, t)
           &= \frac{1}{\sqrt{\alpha_t}} \Big(x_t -
             \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big)
@@ -314,20 +352,32 @@ class Sampler:
         """
         # utils의 gather함수 사용 $\bar\alpha_t$
         alpha_bar = gather(self.alpha_bar, t)
+        # self.alpha_bar는 torch.Size([n_steps])
+        # t는 torch.Size([1])
+        # 지정한 t step의 alpha_bar값만 gather로 추출       
+
         # $\alpha_t$
         alpha = gather(self.alpha, t)
+        # alpha도 지정한 t step의 값만 추출
+
         # $\frac{\beta}{\sqrt{1-\bar\alpha_t}}$
         eps_coef = (1 - alpha) / (1 - alpha_bar) ** .5
         # $$\frac{1}{\sqrt{\alpha_t}} \Big(x_t -
         #      \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big)$$
         mean = 1 / (alpha ** 0.5) * (xt - eps_coef * eps_theta)
+        # p_θ(x_{t-1}|x_t)의 평균 계산
+
         # $\sigma^2$
         var = gather(self.sigma2, t)
+        # sigma2도 지정한 t step의 값만 추출
 
         # $\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$
         eps = torch.randn(xt.shape, device=xt.device)
+        # N(0, I)에서 노이즈 샘플링 
+
         # Sample
         return mean + (var ** .5) * eps
+        # 평균 0, 분산 1인 노이즈로 평균 mean, 분산 var인 x_{t-1}를 생성
 
     # x_t로부터 x_0의 근사값 \hat{x}_0를 얻는 메소드
     def p_x0(self, xt: torch.Tensor, t: torch.Tensor, eps: torch.Tensor):
@@ -336,9 +386,15 @@ class Sampler:
 
         $$x_0 \approx \hat{x}_0 = \frac{1}{\sqrt{\bar\alpha}}
          \Big( x_t - \sqrt{1 - \bar\alpha_t} \textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big)$$
+        
+            # 여기서 x_0의 근사식(\hat{x}_0)은 q(x_t | x_0)로 구해진 x_t = \sqrt{\bar\alpha_t} x_0 +  \sqrt{1 - \bar\alpha_t}\epsilon_0를 
+            # x_0에 대해서 정리한뒤 ground truth noise \epsilon_0를 UNet이 예측한 노이즈 \epsilon_\theta로 변경한 것
         """
         # utils의 gather 함수 사용 $\bar\alpha_t$
         alpha_bar = gather(self.alpha_bar, t)
+        # self.alpha_bar는 torch.Size([n_steps])
+        # t는 torch.Size([1])
+        # 지정한 t step의 alpha_bar값만 gather로 추출
 
         # $$x_0 \approx \hat{x}_0 = \frac{1}{\sqrt{\bar\alpha}}
         #  \Big( x_t - \sqrt{1 - \bar\alpha_t} \textcolor{lightgreen}{\epsilon_\theta}(x_t, t) \Big)$$

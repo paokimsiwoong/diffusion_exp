@@ -13,6 +13,15 @@ def gather(consts: torch.Tensor, t: torch.Tensor):
       그 중 원하는 t-step의 값만 gather로 추출
     """
     c = consts.gather(-1, t)
+    # consts는 torch.Size([n_steps])
+    # t는 torch.Size([b])
+    # gather 후에 c는 torch.Size([b])
+      # n개의 step중 t 텐서 안에 지정된 sample별 time step의 상수 값들만 추출
+        # ex: [c_0, c_1, ..., c_i, ..., c_{T-1}]에서
+        # t로 [1, i, T-1] 가 들어오면 gather 결과 c는 [c_1, c_i, c_{T-1}]이 된다.
+
+    # torch.Size([b, c, h, w]) 형태인 x에 맞춰 
+    # 4차원 [b, 1, 1, 1]로 reshape
     return c.reshape(-1, 1, 1, 1)
 
 # with 구문으로 매번 확실하게 파일을 닫으므로 안전
