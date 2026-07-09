@@ -161,7 +161,8 @@ class Sampler:
         # Sample $T$ steps
         for t_inv in tqdm(
             range(self.n_steps),
-            total=self.n_steps
+            total=self.n_steps,
+            desc='Sample'
         ):
             # $t$
             t_ = self.n_steps - t_inv - 1
@@ -220,6 +221,10 @@ class Sampler:
             # x_t 비디오 파일 생성
             # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
+    # DDPM 논문 4.4 Interpolation 구현
+        # 두 원본 이미지 x_0와 x'_0의 픽셀값을 기준으로(pixel-space) 단순히 interpolate 하면 자연스럽지 않은 보간 결과가 나오지만
+        # x_0와 x'_0들을 forward process로 노이즈를 추가한 이미지 x_t, x'_t로 만든 다음에 그 t-step latent space에서 interpolate 하고
+        # 얻어진 \bar{x}_t를 다시 reverse process에 통과시켜 노이즈를 제거하면 x_0와 x'_0의 특징이 적절히 잘 섞이면서 자연스러운 이미지가 나온다.
     def interpolate(self, x1: torch.Tensor, x2: torch.Tensor, lambda_: float, t_: int = 100):
         """
         #### Interpolate two images $x_0$ and $x'_0$
@@ -242,12 +247,16 @@ class Sampler:
         n_samples = x1.shape[0]
         # $t$ tensor
         t = torch.full((n_samples,), t_, device=self.device)
+
         # $$\bar{x}_t = (1 - \lambda)x_t + \lambda x'_0$$
         xt = (1 - lambda_) * self.diffusion.q_sample(x1, t) + lambda_ * self.diffusion.q_sample(x2, t)
+        # self.diffusion.q_sample 메소드는 q(x_t|x_0)로 원본 이미지에서 t 단계 노이즈 추가 이미지를 만드는 메소드
 
         # $$\bar{x}_0 \sim \textcolor{lightgreen}{p_\theta}(x_0|\bar{x}_t)$$
         return self._sample_x0(xt, t_)
 
+    # 정해진 λ값 하나에 대해서만 보간을 하는 interpolate 메소드와 다르게
+    # 0~1 사이의 다양한 λ값(총 n_frames개)에 대해 보간을 한 결과를 모아서 영상 파일로 만드는 메소드
     def interpolate_animate(self, x1: torch.Tensor, x2: torch.Tensor, n_frames: int = 100, t_: int = 100,
                             create_video=True):
         """
@@ -260,14 +269,18 @@ class Sampler:
         * `create_video` specifies whether to make a video or to show each frame
         """
 
-        # Show original images
-        self.show_image(x1, "x1")
-        self.show_image(x2, "x2")
+        if not create_video:
+            # Show original images
+            self.show_image(x1, "x1")
+            self.show_image(x2, "x2")
+
         # Add batch dimension
         x1 = x1[None, :, :, :]
         x2 = x2[None, :, :, :]
         # $t$ tensor
         t = torch.full((1,), t_, device=self.device)
+
+        # self.diffusion.q_sample 메소드는 q(x_t|x_0)로 원본 이미지에서 t 단계 노이즈 추가 이미지를 만드는 메소드
         # $x_t \sim q(x_t|x_0)$
         x1t = self.diffusion.q_sample(x1, t)
         # $x'_t \sim q(x'_t|x_0)$
@@ -284,20 +297,31 @@ class Sampler:
         ):
             # $\lambda$
             lambda_ = i / n_frames
+            # λ는 loop를 돌면서 0, 1 / n_frames, ...., 1 값을 가진다.
+
             # $$\bar{x}_t = (1 - \lambda)x_t + \lambda x'_0$$
             xt = (1 - lambda_) * x1t + lambda_ * x2t
+            # t-step latent space에서 보간 진행
+
             # $$\bar{x}_0 \sim \textcolor{lightgreen}{p_\theta}(x_0|\bar{x}_t)$$
             x0 = self._sample_x0(xt, t_)
+            # 보간된 x_t를 reverse 프로세스로 복원해 원본 이미지 스페이스의 이미지 생성
+
             # Add to frames
             frames.append(x0[0])
+
             # Show frame
             if not create_video:
                 self.show_image(x0[0], f"{lambda_ :.2f}")
 
         # Make video
         if create_video:
-            self.make_video(frames, self.eval_path / "video.mp4")
+            self.make_video(frames, self.eval_path / "video_interpolation.mp4")
 
+    # 주어진 n_steps 만큼 reverse 프로세스를 진행해 복원하는 함수
+        # n_steps은 interpolation을 진행하는 latent space의 t-step 값
+        # t-step에서 x_t와 x'_t를 보간해 얻은 \bar{x}_t를 다시 원본 이미지 스페이스로 돌리기 위해
+        # t번 reverse 프로세스를 진행한다.
     def _sample_x0(self, xt: torch.Tensor, n_steps: int):
         """
         #### Sample an image using $\textcolor{lightgreen}{p_\theta}(x_{t-1}|x_t)$
@@ -312,6 +336,7 @@ class Sampler:
         for t_ in range(n_steps):
         # 이 루프는 interpolate_animate 함수 안에서 도는 loop 안의 루프이므로
         # tqdm 미사용
+
             t = n_steps - t_ - 1
             # Sample from $\textcolor{lightgreen}{p_\theta}(x_{t-1}|x_t)$
             xt = self.diffusion.p_sample(xt, xt.new_full((n_samples,), t, dtype=torch.long))
@@ -334,6 +359,7 @@ class Sampler:
             self.show_image(x0[i])
 
     # x_t에서 노이즈를 조금 복원한 x_{t-1}를 생성하는 메소드
+        # self.diffusion의 p_sample 메소드와 함수 시그니처만 다르고 하는 일은 같은 사실상 동일한 함수
     def p_sample(self, xt: torch.Tensor, t: torch.Tensor, eps_theta: torch.Tensor):
         """
         #### Sample from $\textcolor{lightgreen}{p_\theta}(x_{t-1}|x_t)$
@@ -420,6 +446,21 @@ def main():
 
     print("".center(100, "-"))
 
+    do_interpolate = input("보간 실험을 추가 진행할까요?(y 입력 시 True, 그 외 False) : ")
+    print(do_interpolate)
+
+    interpolate = False
+
+    if do_interpolate == 'y':
+        interpolate = True
+
+    if interpolate:
+        print("보간 실험을 추가 진행합니다.")
+    else:
+        print("보간 실험을 추가 진행하지 않습니다.")
+
+    print("".center(100, "-"))
+
     yaml_path = exp_path / "exp.yaml"
     pth_path = list(exp_path.glob("*_best.pth"))[0]
     # TODO: best대신 latest를 사용? 또는 둘 중 선택 가능하게 하기
@@ -467,9 +508,9 @@ def main():
         # Sample an image with an denoising animation
         sampler.sample_animation()
 
-        if False:
+        if interpolate:
             # Get some images from data
-            data = next(iter(configs.data_loader)).to(configs.device)
+            data = next(iter(ddpm.data_loader)).to(configs.device)
 
             # Create an interpolation animation
             sampler.interpolate_animate(data[0], data[1])
