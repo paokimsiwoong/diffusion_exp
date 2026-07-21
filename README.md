@@ -16,8 +16,8 @@ diffusion 계열 논문 리뷰 및 모델 실험
 >>### 8. [Three Equivalent Interpretations](./study%20notes/Understanding_Diffusion_Models_A_Unified_Perspective/ch8.md#three-equivalent-interpretations)
 >>### 9. [Score-based Generative Models](./study%20notes/Understanding_Diffusion_Models_A_Unified_Perspective/ch9~10.md#score-based-generative-models)
 >>### 10. [Guidance](./study%20notes/Understanding_Diffusion_Models_A_Unified_Perspective/ch9~10.md#guidance)
-
-[관련 논문 리뷰 노트 ipynb](./study%20notes/diffusion%20model%20이론%20공부.ipynb)
+>## 3. [Denoising Diffusion Probabilistic Models](./study%20notes/Denoising_Diffusion_Probabilistic_Models/Introduction.md)
+>>### 1. [Introduction](./study%20notes/Denoising_Diffusion_Probabilistic_Models/Introduction.md)
 
 ---
 ---
@@ -62,6 +62,12 @@ Diffusion 계열 모델 논문들을 공부하고 내용을 정리한 필기 노
 ---
 
 # [**Understanding Diffusion Models: A Unified Perspective**](./study%20notes/Understanding_Diffusion_Models_A_Unified_Perspective/ch1~3.md)
+---
+---
+---
+
+# [**Denoising Diffusion Probabilistic Models**](./study%20notes/Denoising_Diffusion_Probabilistic_Models/Introduction.md)
+
 ---
 ---
 ---
